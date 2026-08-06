@@ -6,3 +6,5 @@ __pycache__/
 student.json
 
 .env
+
+README.md

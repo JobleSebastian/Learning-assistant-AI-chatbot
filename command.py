@@ -205,6 +205,47 @@ Start a new course using:
 /learn <topic>
 """
 
+def course_command(chatbot):
+
+    if chatbot.student.current_course is None:
+        return "No active course."
+
+    output = ""
+
+    output += "==================================\n"
+    output += f"Course: {chatbot.student.current_course.title()}\n"
+    output += "==================================\n\n"
+
+    # <-- Step 3 goes here
+    for index, lesson in enumerate(chatbot.student.course_outline, start=1):
+
+        if index < chatbot.student.current_lesson:
+            symbol = "✓"
+
+        elif index == chatbot.student.current_lesson:
+            symbol = "▶"
+
+        else:
+            symbol = "□"
+
+        output += f"{symbol} Lesson {index}\n  {lesson}\n\n"
+
+    total_lessons = len(chatbot.student.course_outline)
+
+    completed = chatbot.student.current_lesson - 1
+
+    percentage = int((completed / total_lessons) * 100)
+
+    output += "==================================\n\n"
+
+    output += f"Progress: {completed} / {total_lessons} Lessons Completed ({percentage}%)\n\n"
+
+    output += f"Current Lesson: {chatbot.student.current_lesson}\n\n"
+
+    output += "=================================="
+
+    return output
+
 def execute(chatbot, command):
 
     command = command.lower()
@@ -232,6 +273,9 @@ def execute(chatbot, command):
 
     elif command == "/reset":
         return reset_command(chatbot)
+    
+    elif command == "/course":
+        return course_command(chatbot)
 
     else:
         return "Unknown command. Type /help"
