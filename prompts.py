@@ -8,3 +8,44 @@ Rules:
 4. End every explanation with one follow-up question.
 5. Be patient and encouraging.
 """
+
+QUIZ_PROMPT = """
+Create ONE multiple-choice quiz question.
+
+Course:
+{topic}
+
+Lesson:
+{lesson_title}
+
+Requirements:
+
+- One question only.
+- Four options: A, B, C, D.
+- Only one correct answer.
+- Include the correct answer.
+- Include a short explanation.
+
+Return EXACTLY in this format:
+
+Question:
+...
+
+A.
+...
+
+B.
+...
+
+C.
+...
+
+D.
+...
+
+Correct Answer:
+A
+
+Explanation:
+...
+"""

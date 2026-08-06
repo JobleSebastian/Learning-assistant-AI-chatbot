@@ -1,3 +1,5 @@
+from prompts import QUIZ_PROMPT
+
 def help_command(chatbot):
 
     return """
@@ -111,6 +113,27 @@ Course Outline
 
 Type /next to begin.
 """
+
+
+
+def quiz_command(chatbot):
+
+    if chatbot.student.current_course is None:
+        return "Start a course first using /learn <topic>."
+
+    if chatbot.student.current_lesson == 1:
+        return "Complete the first lesson before taking a quiz."
+
+    lesson_title = chatbot.student.completed_lessons[-1]
+
+    prompt = QUIZ_PROMPT.format(
+        topic=chatbot.student.current_course,
+        lesson_title=lesson_title
+    )
+
+    answer = chatbot.ask(prompt)
+
+    return answer
 
 def progress_command(chatbot):
 
@@ -280,6 +303,9 @@ def execute(chatbot, command):
     
     elif command == "/course":
         return course_command(chatbot)
+
+    elif command == "/quiz":
+        return quiz_command(chatbot)
 
     else:
         return "Unknown command. Type /help"

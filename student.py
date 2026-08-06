@@ -45,6 +45,16 @@ class Student:
 
         self.quiz_score = 0
 
+        self.quiz_score = 0
+
+        self.current_question = ""
+
+        self.current_options = []
+
+        self.correct_answer = ""
+
+        self.explanation = ""
+
         self.streak = 0
 
     def reset_course(self):
