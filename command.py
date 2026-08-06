@@ -158,26 +158,26 @@ to start another course.
     prompt = f"""
 You are an expert teacher.
 
-Teach this lesson from a beginner course on {topic}.
+Teach ONLY this lesson.
+
+Course:
+{topic}
 
 Lesson {lesson_number}:
 {lesson_title}
 
-Only teach this lesson.
+Requirements:
 
-Include:
-
-1. Lesson title
-
-2. Simple explanation
-
-3. Real-world example
-
-4. Small exercise
-
-Do NOT teach future lessons.
-
-Do NOT ask follow-up questions.
+- Start with the lesson title.
+- Give a simple explanation.
+- Give one real-world example.
+- Give one practical exercise.
+- Use beginner-friendly language.
+- Do NOT teach future lessons.
+- Do NOT ask follow-up questions.
+- Do NOT ask the student anything.
+- Do NOT end with a question.
+- End immediately after the exercise.
 """
 
     answer = chatbot.ask(prompt)
@@ -240,7 +240,11 @@ def course_command(chatbot):
 
     output += f"Progress: {completed} / {total_lessons} Lessons Completed ({percentage}%)\n\n"
 
-    output += f"Current Lesson: {chatbot.student.current_lesson}\n\n"
+    if chatbot.student.current_lesson > total_lessons:
+        output += "Current Lesson: Course Completed 🎉\n\n"
+        output += "Start another course using:\n\n/learn <topic>\n\n"
+    else:
+        output += f"Current Lesson: {chatbot.student.current_lesson}\n\n"
 
     output += "=================================="
 
