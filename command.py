@@ -1,4 +1,5 @@
 from prompts import QUIZ_PROMPT
+import random
 
 def help_command(chatbot):
 
@@ -99,6 +100,7 @@ Requirements:
     chatbot.student.course_outline = parse_outline(outline)
     chatbot.student.current_lesson = 1
     chatbot.student.completed_lessons = []
+    chatbot.student.questions_answered = 0
     chatbot.student.save()
 
     return f"""
@@ -124,7 +126,15 @@ def quiz_command(chatbot):
     if chatbot.student.current_lesson == 1:
         return "Complete the first lesson before taking a quiz."
 
-    lesson_title = chatbot.student.completed_lessons[-1]
+    lesson_title = random.choice(chatbot.student.completed_lessons)
+
+    while (
+        len(chatbot.student.completed_lessons) > 1
+        and lesson_title == chatbot.student.last_quiz_lesson
+    ):
+        lesson_title = random.choice(chatbot.student.completed_lessons)
+
+    chatbot.student.last_quiz_lesson = lesson_title
 
     prompt = QUIZ_PROMPT.format(
         topic=chatbot.student.current_course,
@@ -133,7 +143,76 @@ def quiz_command(chatbot):
 
     answer = chatbot.ask(prompt)
 
-    return answer
+    chatbot.student.current_question = answer
+    chatbot.student.quiz_active = True
+
+    correct_start = answer.find("Correct Answer:")
+
+    explanation_start = answer.find("Explanation:")
+
+    correct = answer[
+        correct_start + len("Correct Answer:"):
+        explanation_start
+    ].strip()
+
+    chatbot.student.correct_answer = correct.strip().upper()
+
+    explanation = answer[
+        explanation_start + len("Explanation:")
+    :].strip()
+
+    chatbot.student.explanation = explanation
+
+    question = answer[:correct_start].strip()
+
+    return question
+    
+def answer_command(chatbot, command):
+
+    if not chatbot.student.quiz_active:
+        return "No active quiz. Use /quiz first."
+
+    parts = command.split()
+
+    if len(parts) < 2:
+        return "Usage: /answer A"
+
+    user_answer = parts[1].strip().upper()
+
+    correct = chatbot.student.correct_answer.upper()
+
+    chatbot.student.questions_answered += 1
+
+    chatbot.student.quiz_active = False
+
+    if user_answer == correct:
+
+        chatbot.student.quiz_score += 1
+        chatbot.student.save()
+
+        return f"""
+✅ Correct!
+
+Explanation:
+
+{chatbot.student.explanation}\n
+Use /score to view your quiz statistics.
+"""
+
+    else:
+
+        chatbot.student.save()
+
+        return f"""
+❌ Incorrect.
+
+Correct Answer: {correct}
+
+Explanation:
+
+{chatbot.student.explanation}\n
+Use /score to view your quiz statistics.
+"""
 
 def progress_command(chatbot):
 
@@ -273,6 +352,31 @@ def course_command(chatbot):
 
     return output
 
+def score_command(chatbot):
+
+    answered = chatbot.student.questions_answered
+    correct = chatbot.student.quiz_score
+    incorrect = answered - correct
+
+    if answered == 0:
+        accuracy = 0
+    else:
+        accuracy = round((correct / answered) * 100)
+
+    return f"""
+========== Quiz Statistics ==========
+
+Questions Answered : {answered}
+
+Correct Answers    : {correct}
+
+Incorrect Answers  : {incorrect}
+
+Accuracy           : {accuracy}%
+
+====================================
+"""
+
 def execute(chatbot, command):
 
     command = command.lower()
@@ -306,6 +410,12 @@ def execute(chatbot, command):
 
     elif command == "/quiz":
         return quiz_command(chatbot)
+
+    elif command.startswith("/answer"):
+        return answer_command(chatbot, command)
+
+    elif command == "/score":
+        return score_command(chatbot)
 
     else:
         return "Unknown command. Type /help"

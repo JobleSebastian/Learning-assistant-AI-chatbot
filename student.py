@@ -9,7 +9,9 @@ class Student:
             "course_outline": self.course_outline,
             "current_lesson": self.current_lesson,
             "completed_lessons": self.completed_lessons,
-            "quiz_score": self.quiz_score
+            "quiz_score": self.quiz_score,
+            "questions_answered": self.questions_answered,
+            "quiz_active": self.quiz_active
         }
 
         with open("student.json", "w") as file:
@@ -27,6 +29,8 @@ class Student:
             self.current_lesson = data["current_lesson"]
             self.completed_lessons = data["completed_lessons"]
             self.quiz_score = data["quiz_score"]
+            self.questions_answered = data.get("questions_answered", 0)
+            self.last_quiz_lesson = ""
 
         except FileNotFoundError:
 
@@ -45,7 +49,7 @@ class Student:
 
         self.quiz_score = 0
 
-        self.quiz_score = 0
+        self.questions_answered = 0
 
         self.current_question = ""
 
@@ -54,6 +58,8 @@ class Student:
         self.correct_answer = ""
 
         self.explanation = ""
+
+        self.quiz_active = False
 
         self.streak = 0
 
