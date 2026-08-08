@@ -100,7 +100,9 @@ Requirements:
     chatbot.student.course_outline = parse_outline(outline)
     chatbot.student.current_lesson = 1
     chatbot.student.completed_lessons = []
+    chatbot.student.completed_lesson_contents = []
     chatbot.student.questions_answered = 0
+    chatbot.student.quiz_score = 0
     chatbot.student.save()
 
     return f"""
@@ -126,19 +128,40 @@ def quiz_command(chatbot):
     if chatbot.student.current_lesson == 1:
         return "Complete the first lesson before taking a quiz."
 
-    lesson_title = random.choice(chatbot.student.completed_lessons)
+    lesson_index = random.randrange(
+        len(chatbot.student.completed_lessons)
+    )
+    
+    lesson_title = chatbot.student.completed_lessons[
+    lesson_index
+    ]
+
+    lesson_content = chatbot.student.completed_lesson_contents[
+        lesson_index
+    ]
 
     while (
         len(chatbot.student.completed_lessons) > 1
         and lesson_title == chatbot.student.last_quiz_lesson
     ):
-        lesson_title = random.choice(chatbot.student.completed_lessons)
+        lesson_index = random.randrange(
+            len(chatbot.student.completed_lessons)
+        )
+
+        lesson_title = chatbot.student.completed_lessons[
+            lesson_index
+        ]
+
+        lesson_content = chatbot.student.completed_lesson_contents[
+            lesson_index
+        ]
 
     chatbot.student.last_quiz_lesson = lesson_title
 
     prompt = QUIZ_PROMPT.format(
         topic=chatbot.student.current_course,
-        lesson_title=lesson_title
+        lesson_title=lesson_title,
+        lesson_content=lesson_content
     )
 
     answer = chatbot.ask(prompt)
@@ -285,6 +308,7 @@ Requirements:
     answer = chatbot.ask(prompt)
 
     chatbot.student.completed_lessons.append(lesson_title)
+    chatbot.student.completed_lesson_contents.append(answer)
     chatbot.student.current_lesson += 1
     chatbot.student.save()
 
@@ -352,6 +376,90 @@ def course_command(chatbot):
 
     return output
 
+def review_command(chatbot, command):
+
+    if chatbot.student.current_course is None:
+        return "Start a course first using /learn <topic>."
+
+    if not chatbot.student.completed_lessons:
+        return "You have not completed any lessons yet."
+
+    parts = command.split()
+
+    if len(parts) == 1:
+
+        review = """
+========== Completed Lessons ==========
+
+"""
+
+        for number, lesson in enumerate(
+            chatbot.student.completed_lessons, start=1
+        ):
+            review += f"{number}. {lesson}\n"
+
+        review += """
+========================================
+
+Use /review <number> to review a lesson.
+"""
+
+        return review
+
+    try:
+        lesson_number = int(parts[1])
+    except ValueError:
+        return "Usage: /review <number>"
+
+    if lesson_number < 1 or lesson_number > len(
+        chatbot.student.completed_lessons
+    ):
+        return "Invalid lesson number."
+
+    lesson_title = chatbot.student.completed_lessons[
+        lesson_number - 1
+    ]
+
+    lesson_content = chatbot.student.completed_lesson_contents[
+    lesson_number - 1
+    ]
+
+    topic = chatbot.student.current_course
+
+    prompt = f"""
+You are an expert teacher helping a beginner review a completed lesson.
+
+Course:
+{topic}
+
+Lesson Title:
+{lesson_title}
+
+Lesson Content:
+{lesson_content}
+
+Create a concise review based ONLY on the lesson content provided above.
+
+Rules:
+- Do not use outside knowledge.
+- Do not add facts that are not in the lesson.
+- Do not infer new information.
+- Keep all explanations consistent with the lesson.
+- You may reorganize or simplify the information.
+- You may use examples from the lesson.
+- Do not teach future lessons.
+- Do not ask a follow-up question.
+
+Include:
+
+1. Key concept
+2. Simple explanation
+3. Important points
+4. Practical example
+"""
+
+    return chatbot.ask(prompt)
+
 def score_command(chatbot):
 
     answered = chatbot.student.questions_answered
@@ -413,6 +521,9 @@ def execute(chatbot, command):
 
     elif command.startswith("/answer"):
         return answer_command(chatbot, command)
+
+    elif command.startswith("/review"):
+        return review_command(chatbot, command)
 
     elif command == "/score":
         return score_command(chatbot)

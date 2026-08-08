@@ -10,7 +10,7 @@ Rules:
 """
 
 QUIZ_PROMPT = """
-You are an experienced teacher creating a quiz.
+You are an expert teacher creating a multiple-choice quiz question.
 
 Course:
 {topic}
@@ -18,42 +18,32 @@ Course:
 Lesson:
 {lesson_title}
 
-Create ONE beginner-friendly multiple-choice question.
+Lesson Content:
+{lesson_content}
 
-Requirements:
+Create ONE question based ONLY on the lesson content.
 
-- Base the question ONLY on the lesson.
-- Ask about an important concept from the lesson.
-- There must be exactly ONE correct answer.
-- The question must be clear and unambiguous.
-- Do NOT ask trick questions.
-- Do NOT require outside knowledge.
-- The wrong answers should be believable but clearly incorrect.
-- Do NOT ask follow-up questions.
-- End immediately after the explanation.
+Rules:
+- The correct answer must be explicitly stated or directly demonstrated in the lesson.
+- Do not use outside knowledge.
+- Do not infer facts that are not supported by the lesson.
+- Do not introduce new information.
+- Make sure exactly one option is correct.
+- Create four options: A, B, C, and D.
+- Make the incorrect options plausible but clearly unsupported by the lesson.
 
-Return EXACTLY in this format:
-
-Lesson:
-<lesson title>
+Return exactly this format:
 
 Question:
-...
+<question>
 
-A.
-...
+A. <option>
+B. <option>
+C. <option>
+D. <option>
 
-B.
-...
-
-C.
-...
-
-D.
-...
-
-Correct Answer:
-A
+Correct Answer: <A/B/C/D>
 
 Explanation:
+<explanation>
 """
