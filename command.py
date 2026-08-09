@@ -484,6 +484,247 @@ Accuracy           : {accuracy}%
 
 ====================================
 """
+def flashcards_command(chatbot):
+
+    if chatbot.student.current_course is None:
+        return "Start a course first using /learn <topic>."
+
+    if not chatbot.student.completed_lesson_contents:
+        return "Complete a lesson first before using flashcards."
+
+    lesson_index = random.randrange(
+        len(chatbot.student.completed_lesson_contents)
+    )
+
+    lesson_title = chatbot.student.completed_lessons[
+        lesson_index
+    ]
+
+    lesson_content = chatbot.student.completed_lesson_contents[
+        lesson_index
+    ]
+
+    prompt = f"""
+You are an expert teacher creating a flashcard for a beginner.
+
+Course:
+{chatbot.student.current_course}
+
+Lesson:
+{lesson_title}
+
+Lesson Content:
+{lesson_content}
+
+Create ONE flashcard based ONLY on the lesson content.
+
+Rules:
+- Do not use outside knowledge.
+- Do not introduce information not contained in the lesson.
+- Keep the question simple and clear.
+- The answer must be directly supported by the lesson.
+
+Return EXACTLY this format and nothing else:
+
+Question:
+<question>
+
+Answer:
+<answer>
+
+Do not include:
+- Follow-up questions
+- Additional explanations
+- Extra sections
+- Suggestions
+- Text before "Question:"
+- Text after the answer
+"""
+
+    answer = chatbot.ask(prompt)
+
+    question_start = answer.find("Question:")
+    answer_start = answer.find("Answer:")
+
+    if question_start == -1 or answer_start == -1:
+        return "Unable to create flashcard. Please try again."
+
+    question = answer[
+        question_start + len("Question:"):
+        answer_start
+    ].strip()
+
+    flashcard_answer = answer[
+        answer_start + len("Answer:"):
+    ].strip()
+
+    chatbot.student.current_flashcard = question
+    chatbot.student.current_flashcard_answer = flashcard_answer
+    chatbot.student.flashcard_active = True
+    chatbot.student.flashcard_status = None
+
+    chatbot.student.save()
+
+    return f"""
+========== Flashcard ==========
+
+Question:
+
+{question}
+
+Type /flip to reveal the answer.
+
+===============================
+"""
+
+def flip_command(chatbot):
+
+    if not chatbot.student.flashcard_active:
+        return "No active flashcard. Use /flashcards first."
+
+    answer = chatbot.student.current_flashcard_answer
+
+    chatbot.student.flashcard_active = False
+    chatbot.student.save()
+
+    return f"""
+========== Flashcard Answer ==========
+
+{answer}
+
+======================================
+"""
+
+def know_command(chatbot):
+
+    if chatbot.student.flashcard_active:
+        return "Flip the flashcard first using /flip."
+
+    if chatbot.student.current_flashcard == "":
+        return "No active flashcard. Use /flashcards first."
+
+    chatbot.student.flashcard_status = "known"
+    chatbot.student.save()
+
+    return "✅ Marked as known."
+
+def difficult_command(chatbot):
+
+    if chatbot.student.flashcard_active:
+        return "Flip the flashcard first using /flip."
+
+    if chatbot.student.current_flashcard == "":
+        return "No active flashcard. Use /flashcards first."
+
+    chatbot.student.flashcard_status = "difficult"
+
+    for flashcard in chatbot.student.difficult_flashcards:
+
+        if flashcard["question"] == chatbot.student.current_flashcard:
+            chatbot.student.save()
+            return "📌 Already marked for review."
+
+    flashcard = {
+        "question": chatbot.student.current_flashcard,
+        "answer": chatbot.student.current_flashcard_answer
+    }
+
+    chatbot.student.difficult_flashcards.append(flashcard)
+
+    chatbot.student.save()
+
+    return "📌 Marked for review."
+
+def review_flashcards_command(chatbot):
+
+    if not chatbot.student.difficult_flashcards:
+        return "No difficult flashcards saved."
+
+    chatbot.student.review_flashcard_index = 0
+
+    flashcard = chatbot.student.difficult_flashcards[0]
+
+    chatbot.student.current_flashcard = flashcard["question"]
+    chatbot.student.current_flashcard_answer = flashcard["answer"]
+
+    chatbot.student.flashcard_active = True
+    chatbot.student.flashcard_status = None
+
+    chatbot.student.save()
+
+    return f"""
+========== Flashcard Review ==========
+
+Question:
+
+{flashcard["question"]}
+
+Type /flip to reveal the answer.
+
+======================================
+"""
+
+def known_command(chatbot):
+
+    if chatbot.student.flashcard_active:
+        return "Flip the flashcard first using /flip."
+
+    if chatbot.student.current_flashcard == "":
+        return "No active flashcard. Use /review-flashcards first."
+
+    index = chatbot.student.review_flashcard_index
+
+    if index < 0 or index >= len(chatbot.student.difficult_flashcards):
+        return "No active difficult flashcard."
+
+    flashcard = chatbot.student.difficult_flashcards[index]
+
+    if flashcard["question"] != chatbot.student.current_flashcard:
+        return "The current flashcard does not match the review card."
+
+    chatbot.student.difficult_flashcards.pop(index)
+
+    chatbot.student.flashcard_status = "known"
+
+    if chatbot.student.difficult_flashcards:
+
+        if index >= len(chatbot.student.difficult_flashcards):
+            index = 0
+
+        chatbot.student.review_flashcard_index = index
+
+        next_flashcard = chatbot.student.difficult_flashcards[index]
+
+        chatbot.student.current_flashcard = next_flashcard["question"]
+        chatbot.student.current_flashcard_answer = next_flashcard["answer"]
+
+        chatbot.student.flashcard_active = True
+        chatbot.student.flashcard_status = None
+
+        chatbot.student.save()
+
+        return f"""
+✅ Removed from difficult flashcards.
+
+========== Next Flashcard ==========
+
+Question:
+
+{next_flashcard["question"]}
+
+Type /flip to reveal the answer.
+
+=====================================
+"""
+
+    chatbot.student.review_flashcard_index = -1
+    chatbot.student.current_flashcard = ""
+    chatbot.student.current_flashcard_answer = ""
+    chatbot.student.flashcard_active = False
+
+    chatbot.student.save()
+
+    return "✅ Removed from difficult flashcards. You have no more difficult flashcards."
 
 def execute(chatbot, command):
 
@@ -522,11 +763,29 @@ def execute(chatbot, command):
     elif command.startswith("/answer"):
         return answer_command(chatbot, command)
 
+    elif command == "/review-flashcards":
+         return review_flashcards_command(chatbot)
+
     elif command.startswith("/review"):
         return review_command(chatbot, command)
 
     elif command == "/score":
         return score_command(chatbot)
+
+    elif command == "/flashcards":
+        return flashcards_command(chatbot)
+
+    elif command == "/flip":
+        return flip_command(chatbot)
+
+    elif command == "/know":
+        return know_command(chatbot)
+
+    elif command == "/known":
+        return known_command(chatbot)
+
+    elif command == "/difficult":
+        return difficult_command(chatbot)
 
     else:
         return "Unknown command. Type /help"

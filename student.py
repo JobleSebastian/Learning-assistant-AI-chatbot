@@ -12,6 +12,12 @@ class Student:
             "completed_lesson_contents": self.completed_lesson_contents,
             "quiz_score": self.quiz_score,
             "questions_answered": self.questions_answered,
+            "flashcard_active": self.flashcard_active,
+            "current_flashcard": self.current_flashcard,
+            "current_flashcard_answer": self.current_flashcard_answer,
+            "flashcard_status": self.flashcard_status,
+            "difficult_flashcards": self.difficult_flashcards,
+            "review_flashcard_index": self.review_flashcard_index,
             "quiz_active": self.quiz_active
         }
 
@@ -33,6 +39,13 @@ class Student:
             self.quiz_score = data["quiz_score"]
             self.questions_answered = data.get("questions_answered", 0)
             self.last_quiz_lesson = ""
+            self.flashcard_active = data.get("flashcard_active", False)
+            self.current_flashcard = data.get("current_flashcard", "")
+            self.current_flashcard_answer = data.get("current_flashcard_answer", "")
+            self.flashcard_status = data.get("flashcard_status", None)
+            self.difficult_flashcards = data.get("difficult_flashcards", [])
+            self.review_flashcard_index = data.get("review_flashcard_index", -1)
+            
 
         except FileNotFoundError:
 
@@ -64,6 +77,18 @@ class Student:
         self.explanation = ""
 
         self.quiz_active = False
+
+        self.flashcard_active = False
+
+        self.current_flashcard = ""
+
+        self.current_flashcard_answer = ""
+
+        self.flashcard_status = None
+
+        self.difficult_flashcards = []
+
+        self.review_flashcard_index = -1
 
         self.streak = 0
 
