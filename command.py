@@ -293,7 +293,7 @@ Lesson {lesson_number}:
 
 Requirements:
 
-- Start with the lesson title.
+- Start with exactly: Lesson {lesson_number}: {lesson_title}
 - Give a simple explanation.
 - Give one real-world example.
 - Give one practical exercise.
@@ -726,6 +726,80 @@ Type /flip to reveal the answer.
 
     return "✅ Removed from difficult flashcards. You have no more difficult flashcards."
 
+def dashboard_command(chatbot):
+
+    if chatbot.student.current_course is None:
+        return "Start a course first using /learn <topic>."
+
+    total_lessons = len(chatbot.student.course_outline)
+    completed_lessons = len(chatbot.student.completed_lessons)
+
+    if total_lessons > 0:
+        progress_percent = round(
+        (completed_lessons / total_lessons) * 100
+    )
+    else:
+        progress_percent = 0
+
+    bar_length = 10
+    filled = round(
+          (completed_lessons / total_lessons) * bar_length
+    ) if total_lessons > 0 else 0
+
+    progress_bar = "█" * filled + "░" * (bar_length - filled)
+
+    questions_answered = chatbot.student.questions_answered
+    quiz_score = chatbot.student.quiz_score
+
+    if questions_answered > 0:
+        accuracy = round(
+            (quiz_score / questions_answered) * 100
+        )
+    else:
+        accuracy = 0
+
+    difficult_cards = len(
+        chatbot.student.difficult_flashcards
+    )
+
+    if difficult_cards > 0:
+       recommendation = "Review your difficult flashcards using /review-flashcards."
+
+    elif questions_answered > 0 and accuracy < 60:
+       recommendation = "Your quiz accuracy is low. Try /review before taking another quiz."
+
+    elif completed_lessons < total_lessons:
+       recommendation = "Continue learning with /next."
+
+    else:
+       recommendation = "Course completed! Review your knowledge with /quiz."
+
+    return f"""
+========== Learning Dashboard ==========
+
+Course:
+{chatbot.student.current_course}
+
+Lessons
+Progress: {progress_bar} {progress_percent}%
+Completed: {completed_lessons} / {total_lessons}
+Current Lesson: {chatbot.student.current_lesson}
+
+Quiz
+Questions Answered: {questions_answered}
+Correct Answers: {quiz_score}
+Incorrect Answers: {questions_answered - quiz_score}
+Accuracy: {accuracy}%
+
+Flashcards
+Difficult Cards: {difficult_cards}
+
+Recommendation
+{recommendation}
+
+=========================================
+"""
+
 def execute(chatbot, command):
 
     command = command.lower()
@@ -786,6 +860,9 @@ def execute(chatbot, command):
 
     elif command == "/difficult":
         return difficult_command(chatbot)
+
+    elif command == "/dashboard":
+        return dashboard_command(chatbot)
 
     else:
         return "Unknown command. Type /help"
