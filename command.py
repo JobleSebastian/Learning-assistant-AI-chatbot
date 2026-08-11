@@ -1,4 +1,4 @@
-from prompts import QUIZ_PROMPT
+from prompts import QUIZ_PROMPT, QUALITY_CHECK_PROMPT, LESSON_PROMPT
 import random
 
 def help_command(chatbot):
@@ -166,30 +166,50 @@ def quiz_command(chatbot):
 
     answer = chatbot.ask(prompt)
 
+    print("\n========== RAW QUIZ RESPONSE ==========")
+    print(answer)
+    print("========================================\n")
+
     chatbot.student.current_question = answer
     chatbot.student.quiz_active = True
 
     correct_start = answer.find("Correct Answer:")
-
     explanation_start = answer.find("Explanation:")
+
+    if correct_start == -1 or explanation_start == -1:
+        return "Quiz generation failed. Please use /quiz again."
 
     correct = answer[
         correct_start + len("Correct Answer:"):
         explanation_start
     ].strip()
 
-    chatbot.student.correct_answer = correct.strip().upper()
-
     explanation = answer[
-        explanation_start + len("Explanation:")
-    :].strip()
+        explanation_start + len("Explanation:"):
+    ].strip()
 
+    follow_up_start = explanation.find("Follow-up question:")
+
+    if follow_up_start != -1:
+        explanation = explanation[:follow_up_start].strip()
+
+    if not correct or not explanation:
+        print("\n========== INVALID QUIZ RESPONSE ==========")
+        print("Correct:", repr(correct))
+        print("Explanation:", repr(explanation))
+        print("============================================\n")
+
+        return "Quiz generation failed. Please use /quiz again."
+
+    chatbot.student.correct_answer = correct.upper()
     chatbot.student.explanation = explanation
+
+    chatbot.student.current_question = answer
+    chatbot.student.quiz_active = True
 
     question = answer[:correct_start].strip()
 
     return question
-    
 def answer_command(chatbot, command):
 
     if not chatbot.student.quiz_active:
@@ -256,9 +276,46 @@ Quiz Score : {chatbot.student.quiz_score}
 ==============================
 """
 
-def next_command(chatbot):
-    if chatbot.student.current_lesson > len(chatbot.student.course_outline):
+def validate_lesson(answer, lesson_number, lesson_title):
 
+    if not answer or not answer.strip():
+        return False
+
+    answer_lower = answer.lower()
+
+    # Lesson title must be present
+    expected_title = f"Lesson {lesson_number}: {lesson_title}"
+
+    if expected_title.lower() not in answer_lower:
+        return False
+
+    # Required sections
+    if "example" not in answer_lower:
+        return False
+
+    if "exercise" not in answer_lower:
+        return False
+
+    # Must not contain follow-up questions
+    forbidden_phrases = [
+        "follow-up question:",
+        "follow up question:",
+        "would you like",
+        "do you want to",
+        "can you think"
+    ]
+
+    for phrase in forbidden_phrases:
+        if phrase in answer_lower:
+            return False
+
+    return True
+
+def next_command(chatbot):
+
+    if chatbot.student.current_lesson > len(
+        chatbot.student.course_outline
+    ):
         return """
 🎉 Congratulations!
 
@@ -270,6 +327,7 @@ Use
 
 to start another course.
 """
+
     if chatbot.student.current_course is None:
         return "Start a course first using /learn <topic>."
 
@@ -277,42 +335,99 @@ to start another course.
     topic = chatbot.student.current_course
 
     lesson_title = chatbot.student.course_outline[
-    lesson_number - 1
+        lesson_number - 1
     ]
 
-    prompt = f"""
-You are an expert teacher.
+    prompt = LESSON_PROMPT.format(
+        topic=topic,
+        lesson_number=lesson_number,
+        lesson_title=lesson_title
+    )
 
-Teach ONLY this lesson.
+    subject_guidance = get_subject_guidance(topic)
 
-Course:
-{topic}
+    if subject_guidance:
+        prompt += "\n" + subject_guidance
 
-Lesson {lesson_number}:
-{lesson_title}
+    MAX_LESSON_RETRIES = 3
 
-Requirements:
+    previous_warning = ""
 
-- Start with exactly: Lesson {lesson_number}: {lesson_title}
-- Give a simple explanation.
-- Give one real-world example.
-- Give one practical exercise.
-- Use beginner-friendly language.
-- Do NOT teach future lessons.
-- Do NOT ask follow-up questions.
-- Do NOT ask the student anything.
-- Do NOT end with a question.
-- End immediately after the exercise.
-"""
+    for attempt in range(MAX_LESSON_RETRIES):
 
-    answer = chatbot.ask(prompt)
+        current_prompt = prompt
 
-    chatbot.student.completed_lessons.append(lesson_title)
-    chatbot.student.completed_lesson_contents.append(answer)
-    chatbot.student.current_lesson += 1
-    chatbot.student.save()
+        if previous_warning:
+            current_prompt = f"""
+    {prompt}
 
-    return answer
+    IMPORTANT:
+    A previous version of this lesson failed the quality check.
+
+    The reviewer identified this problem:
+
+    {previous_warning}
+
+    Generate a new version that corrects this problem.
+    Do not repeat the problematic claim or instruction.
+    """
+        
+        answer = chatbot.ask(current_prompt)
+
+        if not validate_lesson(
+            answer,
+            lesson_number,
+            lesson_title
+        ):
+            if attempt < MAX_LESSON_RETRIES - 1:
+                previous_warning = (
+                    "The lesson failed the required lesson structure. "
+                    "Make sure it contains the lesson title, an example, "
+                    "and a practical exercise."
+                )
+                continue
+
+            return (
+                "Lesson generation failed after "
+                f"{MAX_LESSON_RETRIES} attempts. "
+                "Please use /next again."
+            )
+
+        quality_prompt = QUALITY_CHECK_PROMPT.format(
+            topic=topic,
+            lesson_title=lesson_title,
+            lesson_content=answer
+        )
+
+        quality_result = chatbot.ask(quality_prompt)
+
+        if quality_result.strip().upper().startswith("PASS"):
+
+            chatbot.student.completed_lessons.append(
+                lesson_title
+            )
+
+            chatbot.student.completed_lesson_contents.append(
+                answer
+            )
+
+            chatbot.student.current_lesson += 1
+            chatbot.student.save()
+
+            return answer
+
+        previous_warning = quality_result
+
+        if attempt < MAX_LESSON_RETRIES - 1:
+            continue
+
+        return f"""
+    Lesson quality check failed after {MAX_LESSON_RETRIES} attempts.
+
+    {quality_result}
+
+    Please use /next again.
+    """
 
 def reset_command(chatbot):
 
@@ -800,6 +915,99 @@ Recommendation
 =========================================
 """
 
+def test_quality_check(chatbot, lesson_content, lesson_title):
+
+    prompt = QUALITY_CHECK_PROMPT.format(
+        topic=chatbot.student.current_course,
+        lesson_title=lesson_title,
+        lesson_content=lesson_content
+    )
+
+    result = chatbot.ask(prompt)
+
+    print("\n========== QUALITY CHECK ==========")
+    print(result)
+    print("===================================\n")
+
+    return result
+
+def quality_command(chatbot):
+
+    if chatbot.student.current_course is None:
+        return "Start a course first using /learn <topic>."
+
+    if not chatbot.student.completed_lesson_contents:
+        return "Complete a lesson first."
+
+    lesson_index = 5
+
+    lesson_title = chatbot.student.completed_lessons[
+        lesson_index
+    ]
+
+    lesson_content = chatbot.student.completed_lesson_contents[
+        lesson_index
+    ]
+
+    prompt = QUALITY_CHECK_PROMPT.format(
+        topic=chatbot.student.current_course,
+        lesson_title=lesson_title,
+        lesson_content=lesson_content
+    )
+
+    result = chatbot.ask(prompt)
+
+    return f"""
+========== Lesson Quality Check ==========
+
+Lesson:
+{lesson_title}
+
+Result:
+{result}
+
+==========================================
+"""
+
+def get_subject_guidance(topic):
+
+    topic_lower = topic.lower()
+
+    if any(word in topic_lower for word in [
+        "tennis",
+        "table tennis",
+        "volleyball",
+        "basketball",
+        "football",
+        "soccer"
+    ]):
+        return """
+Subject-specific guidance:
+
+- Distinguish official rules from optional techniques and strategies.
+- Describe techniques according to their standard definitions.
+- Do not define a technique solely by which hand is used unless that is part of its standard definition.
+- Do not present optional strategies as mandatory rules.
+"""
+
+    if any(word in topic_lower for word in [
+        "python",
+        "c++",
+        "java",
+        "programming",
+        "coding"
+    ]):
+        return """
+Subject-specific guidance:
+
+- Use correct programming terminology.
+- Distinguish programming concepts from practical examples.
+- Do not present invalid syntax as working code.
+- Keep code examples appropriate for the lesson level.
+"""
+
+    return ""
+
 def execute(chatbot, command):
 
     command = command.lower()
@@ -863,6 +1071,9 @@ def execute(chatbot, command):
 
     elif command == "/dashboard":
         return dashboard_command(chatbot)
+
+    elif command == "/quality":
+        return quality_command(chatbot)
 
     else:
         return "Unknown command. Type /help"
