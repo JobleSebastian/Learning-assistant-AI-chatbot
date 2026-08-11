@@ -118,8 +118,75 @@ Course Outline
 Type /next to begin.
 """
 
+def validate_quiz(answer):
 
+    correct_start = answer.find("Correct Answer:")
+    explanation_start = answer.find("Explanation:")
 
+    if correct_start == -1: 
+        return False
+
+    if explanation_start == -1:  
+        return False
+
+    question_part = answer[:correct_start].strip()
+
+    correct_part = answer[
+        correct_start + len("Correct Answer:"):
+        explanation_start
+    ].strip()
+
+    explanation = answer.split(
+        "Explanation:",
+        1
+    )[1].strip()
+
+    if not question_part:  
+        return False
+
+    if not explanation:   
+        return False
+
+    if correct_part.upper() not in ["A", "B", "C", "D"]:    
+        return False
+
+    lines = question_part.splitlines()
+
+    options = {}
+
+    for line in lines:
+
+        line = line.strip()
+
+        if line.startswith("A."):
+            options["A"] = line[2:].strip()
+
+        elif line.startswith("B."):
+            options["B"] = line[2:].strip()
+
+        elif line.startswith("C."):
+            options["C"] = line[2:].strip()
+
+        elif line.startswith("D."):
+            options["D"] = line[2:].strip()
+
+    
+
+    if len(options) != 4:  
+        return False
+
+    for option in ["A", "B", "C", "D"]:
+
+        if not options[option]:      
+            return False
+
+    if "Follow-up question:" in explanation:     
+        return False
+
+    if "Follow-up:" in explanation:
+        return False
+    
+    return True
 def quiz_command(chatbot):
 
     if chatbot.student.current_course is None:
@@ -156,7 +223,6 @@ def quiz_command(chatbot):
             lesson_index
         ]
 
-    chatbot.student.last_quiz_lesson = lesson_title
 
     prompt = QUIZ_PROMPT.format(
         topic=chatbot.student.current_course,
@@ -164,52 +230,48 @@ def quiz_command(chatbot):
         lesson_content=lesson_content
     )
 
-    answer = chatbot.ask(prompt)
+    MAX_QUIZ_RETRIES = 3
 
-    print("\n========== RAW QUIZ RESPONSE ==========")
-    print(answer)
-    print("========================================\n")
+    for attempt in range(MAX_QUIZ_RETRIES):
 
-    chatbot.student.current_question = answer
-    chatbot.student.quiz_active = True
+        answer = chatbot.ask(prompt)
+
+
+        if validate_quiz(answer):
+            break
+
+        if attempt == MAX_QUIZ_RETRIES - 1:
+            return (
+                "Quiz generation failed after "
+                f"{MAX_QUIZ_RETRIES} attempts. "
+                "Please use /quiz again."
+            )
+
+    chatbot.student.last_quiz_lesson = lesson_title
 
     correct_start = answer.find("Correct Answer:")
     explanation_start = answer.find("Explanation:")
-
-    if correct_start == -1 or explanation_start == -1:
-        return "Quiz generation failed. Please use /quiz again."
 
     correct = answer[
         correct_start + len("Correct Answer:"):
         explanation_start
     ].strip()
 
-    explanation = answer[
-        explanation_start + len("Explanation:"):
-    ].strip()
-
-    follow_up_start = explanation.find("Follow-up question:")
-
-    if follow_up_start != -1:
-        explanation = explanation[:follow_up_start].strip()
-
-    if not correct or not explanation:
-        print("\n========== INVALID QUIZ RESPONSE ==========")
-        print("Correct:", repr(correct))
-        print("Explanation:", repr(explanation))
-        print("============================================\n")
-
-        return "Quiz generation failed. Please use /quiz again."
+    explanation = answer.split(
+        "Explanation:",
+        1
+    )[1].strip()
 
     chatbot.student.correct_answer = correct.upper()
     chatbot.student.explanation = explanation
 
     chatbot.student.current_question = answer
     chatbot.student.quiz_active = True
-
+    
     question = answer[:correct_start].strip()
 
     return question
+
 def answer_command(chatbot, command):
 
     if not chatbot.student.quiz_active:
