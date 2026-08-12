@@ -21,21 +21,53 @@ Lesson:
 Lesson Content:
 {lesson_content}
 
+Recent Quiz Questions:
+{quiz_history}
+
 Create ONE multiple-choice question based ONLY on the lesson content provided above.
 
 Rules:
 
+- Base the entire question, all options, and the explanation ONLY on the lesson content provided above.
 - The correct answer MUST be explicitly stated in the lesson content or directly demonstrated by it.
 - Do NOT use outside knowledge, even if you know the information is true.
-- Do NOT correct, expand, or reinterpret the lesson content.
-- Do NOT introduce facts, rules, numbers, definitions, examples, or terminology that are not in the lesson content.
-- The question must test something the student could learn directly from this lesson.
+- Do NOT correct, expand, reinterpret, or contradict the lesson content.
+- Do NOT introduce facts, rules, numbers, definitions, examples, terminology, or procedures that are not supported by the lesson content.
+- Do NOT ask about information that is missing from the lesson.
 - Make sure exactly ONE option is supported as correct by the lesson content.
-- The three incorrect options must be unsupported by the lesson content.
+- The three incorrect options must not be supported as correct by the lesson content.
 - Do not make an incorrect option correct using outside knowledge.
-- The explanation must only explain the answer using information from the lesson content.
-- Create exactly four options: A, B, C, and D.
-- Do not ask a question about information that is missing from the lesson.
+- The explanation must justify the correct answer using ONLY the lesson content.
+- Do not repeat or closely rephrase any recent quiz question.
+- Prefer a different important learning point when one is available.
+- If the recent questions already cover several learning points from this lesson, choose an uncovered important learning point when possible.
+
+Question selection:
+
+- First identify the main learning points covered in the lesson.
+- Prefer testing an important learning point rather than an incidental detail.
+- Prefer the main concept, rule, definition, process, or technique taught in the lesson.
+- The question should test something meaningful that the student could learn from the lesson.
+- Use practical exercise details only when they represent an important learning point or procedure.
+- Avoid focusing on minor numbers, distances, repetition counts, or other incidental exercise details when the lesson contains more important concepts.
+- Vary the question style when the lesson content allows it.
+- Questions may test:
+  - understanding of a concept,
+  - identification of a correct statement,
+  - distinction between two concepts,
+  - application of a technique or procedure explicitly described in the lesson,
+  - or an important practical instruction.
+- When several important learning points are available, prefer one that is different from the most obvious or repeatedly testable detail of the lesson.
+- Do not make the question artificially difficult or rely on wording tricks or obscure details.
+- Do not begin with generic phrases such as "What is a key part...", "What equipment is identified...", or "What is the setup..." when a more direct question about the main learning point is possible.
+
+Options:
+
+- Make incorrect options plausible and relevant to the lesson topic.
+- Incorrect options must remain unsupported as correct by the lesson content.
+- Do not require outside knowledge to distinguish the correct option from the incorrect options.
+- Avoid obviously unrelated distractors unless the lesson itself discusses them.
+- Do not make the correct option noticeably longer, more detailed, or more specific than the other options merely to reveal the answer.
 
 Return exactly this format:
 
@@ -52,6 +84,7 @@ Explanation:
 Write 1-2 complete sentences explaining why the correct answer is supported by the lesson content.
 
 IMPORTANT:
+
 - The explanation MUST NOT be empty.
 - The explanation MUST be based only on the lesson content.
 - Stop immediately after the explanation.

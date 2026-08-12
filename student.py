@@ -18,7 +18,9 @@ class Student:
             "flashcard_status": self.flashcard_status,
             "difficult_flashcards": self.difficult_flashcards,
             "review_flashcard_index": self.review_flashcard_index,
-            "quiz_active": self.quiz_active
+            "quiz_active": self.quiz_active,
+            "quiz_history": self.quiz_history
+            
         }
 
         with open("student.json", "w") as file:
@@ -45,6 +47,7 @@ class Student:
             self.flashcard_status = data.get("flashcard_status", None)
             self.difficult_flashcards = data.get("difficult_flashcards", [])
             self.review_flashcard_index = data.get("review_flashcard_index", -1)
+            self.quiz_history = data.get("quiz_history", [])
             
 
         except FileNotFoundError:
@@ -89,6 +92,8 @@ class Student:
         self.difficult_flashcards = []
 
         self.review_flashcard_index = -1
+
+        self.quiz_history = []
 
         self.streak = 0
 

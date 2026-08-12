@@ -187,6 +187,7 @@ def validate_quiz(answer):
         return False
     
     return True
+
 def quiz_command(chatbot):
 
     if chatbot.student.current_course is None:
@@ -223,11 +224,19 @@ def quiz_command(chatbot):
             lesson_index
         ]
 
+    recent_quiz_history = chatbot.student.quiz_history[-5:]
+
+    history_text = ""
+
+    for item in recent_quiz_history:
+        history_text += f"- {item}\n"        
+
 
     prompt = QUIZ_PROMPT.format(
         topic=chatbot.student.current_course,
         lesson_title=lesson_title,
-        lesson_content=lesson_content
+        lesson_content=lesson_content,
+        quiz_history=history_text
     )
 
     MAX_QUIZ_RETRIES = 3
@@ -269,6 +278,9 @@ def quiz_command(chatbot):
     chatbot.student.quiz_active = True
     
     question = answer[:correct_start].strip()
+
+    chatbot.student.quiz_history.append(question)
+    chatbot.student.save()
 
     return question
 
