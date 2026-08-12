@@ -19,6 +19,7 @@ class Student:
             "difficult_flashcards": self.difficult_flashcards,
             "review_flashcard_index": self.review_flashcard_index,
             "quiz_active": self.quiz_active,
+            "flashcard_history": self.flashcard_history,
             "quiz_history": self.quiz_history
             
         }
@@ -48,6 +49,7 @@ class Student:
             self.difficult_flashcards = data.get("difficult_flashcards", [])
             self.review_flashcard_index = data.get("review_flashcard_index", -1)
             self.quiz_history = data.get("quiz_history", [])
+            self.flashcard_history = data.get("flashcard_history", [])
             
 
         except FileNotFoundError:
@@ -95,6 +97,8 @@ class Student:
 
         self.quiz_history = []
 
+        self.flashcard_history = []
+
         self.streak = 0
 
     def reset_course(self):
@@ -128,3 +132,5 @@ class Student:
         self.difficult_flashcards = []
 
         self.review_flashcard_index = -1
+
+        self.flashcard_history = []

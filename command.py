@@ -673,6 +673,7 @@ Accuracy           : {accuracy}%
 
 ====================================
 """
+
 def flashcards_command(chatbot):
 
     if chatbot.student.current_course is None:
@@ -680,6 +681,9 @@ def flashcards_command(chatbot):
 
     if not chatbot.student.completed_lesson_contents:
         return "Complete a lesson first before using flashcards."
+
+    if chatbot.student.flashcard_active:
+        return "Flip the current flashcard first using /flip."
 
     lesson_index = random.randrange(
         len(chatbot.student.completed_lesson_contents)
@@ -693,6 +697,16 @@ def flashcards_command(chatbot):
         lesson_index
     ]
 
+    recent_flashcard_history = chatbot.student.flashcard_history[-5:]
+
+    history_text = ""
+
+    for item in recent_flashcard_history:
+        history_text += (
+            f"- Question: {item['question']}\n"
+            f"  Lesson: {item['lesson']}\n"
+        )
+
     prompt = f"""
 You are an expert teacher creating a flashcard for a beginner.
 
@@ -705,6 +719,9 @@ Lesson:
 Lesson Content:
 {lesson_content}
 
+Recent Flashcards:
+{history_text}
+
 Create ONE flashcard based ONLY on the lesson content.
 
 Rules:
@@ -712,6 +729,11 @@ Rules:
 - Do not introduce information not contained in the lesson.
 - Keep the question simple and clear.
 - The answer must be directly supported by the lesson.
+- Do not repeat or closely rephrase any recent flashcard question.
+- Prioritize the lesson's main concept, rule, definition, process, or technique.
+- Prefer an important learning point that has not recently been tested when one is available.
+- Do not use a real-world example as the flashcard topic when the lesson contains a more important learning point.
+- Do not create a flashcard merely to recall an example, analogy, or exercise detail unless it is itself an important learning point.
 
 Return EXACTLY this format and nothing else:
 
@@ -730,13 +752,24 @@ Do not include:
 - Text after the answer
 """
 
-    answer = chatbot.ask(prompt)
+    MAX_FLASHCARD_RETRIES = 3
+
+    for attempt in range(MAX_FLASHCARD_RETRIES):
+
+        answer = chatbot.ask(prompt)
+
+        if validate_flashcard(answer):
+            break
+
+        if attempt == MAX_FLASHCARD_RETRIES - 1:
+            return (
+                "Flashcard generation failed after "
+                f"{MAX_FLASHCARD_RETRIES} attempts. "
+                "Please use /flashcards again."
+            )
 
     question_start = answer.find("Question:")
-    answer_start = answer.find("Answer:")
-
-    if question_start == -1 or answer_start == -1:
-        return "Unable to create flashcard. Please try again."
+    answer_start = answer.find("Answer:")    
 
     question = answer[
         question_start + len("Question:"):
@@ -751,6 +784,11 @@ Do not include:
     chatbot.student.current_flashcard_answer = flashcard_answer
     chatbot.student.flashcard_active = True
     chatbot.student.flashcard_status = None
+
+    chatbot.student.flashcard_history.append({
+        "question": question,
+        "lesson": lesson_title
+    })
 
     chatbot.student.save()
 
@@ -823,6 +861,40 @@ def difficult_command(chatbot):
     chatbot.student.save()
 
     return "📌 Marked for review."
+
+def validate_flashcard(answer):
+
+    question_start = answer.find("Question:")
+    answer_start = answer.find("Answer:")
+
+    if question_start == -1:
+        return False
+
+    if answer_start == -1:
+        return False
+
+    question = answer[
+        question_start + len("Question:"):
+        answer_start
+    ].strip()
+
+    flashcard_answer = answer[
+        answer_start + len("Answer:"):
+    ].strip()
+
+    if not question:
+        return False
+
+    if not flashcard_answer:
+        return False
+
+    if "Follow-up question:" in flashcard_answer:
+        return False
+
+    if "Follow-up:" in flashcard_answer:
+        return False
+
+    return True
 
 def review_flashcards_command(chatbot):
 
