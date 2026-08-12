@@ -96,14 +96,14 @@ Requirements:
 
     outline = chatbot.ask(prompt)
 
+    chatbot.student.reset_course()
+
     chatbot.student.current_course = topic
     chatbot.student.course_outline = parse_outline(outline)
     chatbot.student.current_lesson = 1
-    chatbot.student.completed_lessons = []
-    chatbot.student.completed_lesson_contents = []
-    chatbot.student.questions_answered = 0
-    chatbot.student.quiz_score = 0
+
     chatbot.student.save()
+        
 
     return f"""
 Course created!

@@ -107,4 +107,24 @@ class Student:
 
         self.completed_lessons = []
 
+        self.completed_lesson_contents = []
+
+        self.questions_answered = 0
+
         self.quiz_score = 0
+
+        self.quiz_history = []
+
+        self.last_quiz_lesson = ""
+
+        self.flashcard_active = False
+
+        self.current_flashcard = ""
+
+        self.current_flashcard_answer = ""
+
+        self.flashcard_status = None
+
+        self.difficult_flashcards = []
+
+        self.review_flashcard_index = -1
