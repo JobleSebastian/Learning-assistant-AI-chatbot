@@ -20,6 +20,8 @@ class Student:
             "review_flashcard_index": self.review_flashcard_index,
             "quiz_active": self.quiz_active,
             "flashcard_history": self.flashcard_history,
+            "quiz_results": self.quiz_results,
+            "current_quiz_lesson": self.current_quiz_lesson,
             "quiz_history": self.quiz_history
             
         }
@@ -50,11 +52,13 @@ class Student:
             self.review_flashcard_index = data.get("review_flashcard_index", -1)
             self.quiz_history = data.get("quiz_history", [])
             self.flashcard_history = data.get("flashcard_history", [])
+            self.quiz_results = data.get("quiz_results", [])
+            self.current_quiz_lesson = data.get("current_quiz_lesson", "")
             
-
         except FileNotFoundError:
 
             pass
+
     def __init__(self):
 
         self.name = ""
@@ -99,6 +103,10 @@ class Student:
 
         self.flashcard_history = []
 
+        self.quiz_results = []
+
+        self.current_quiz_lesson = ""
+
         self.streak = 0
 
     def reset_course(self):
@@ -134,3 +142,7 @@ class Student:
         self.review_flashcard_index = -1
 
         self.flashcard_history = []
+
+        self.quiz_results = []
+
+        self.current_quiz_lesson = ""

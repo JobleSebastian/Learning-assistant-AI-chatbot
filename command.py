@@ -257,6 +257,7 @@ def quiz_command(chatbot):
             )
 
     chatbot.student.last_quiz_lesson = lesson_title
+    chatbot.student.current_quiz_lesson = lesson_title
 
     correct_start = answer.find("Correct Answer:")
     explanation_start = answer.find("Explanation:")
@@ -297,12 +298,19 @@ def answer_command(chatbot, command):
     user_answer = parts[1].strip().upper()
 
     correct = chatbot.student.correct_answer.upper()
+    is_correct = user_answer == correct
 
     chatbot.student.questions_answered += 1
 
+    chatbot.student.quiz_results.append({
+        "question": chatbot.student.current_question,
+        "lesson": chatbot.student.current_quiz_lesson,
+        "correct": is_correct
+    })
+
     chatbot.student.quiz_active = False
 
-    if user_answer == correct:
+    if is_correct:
 
         chatbot.student.quiz_score += 1
         chatbot.student.save()
@@ -691,7 +699,7 @@ def score_command(chatbot):
     else:
         accuracy = round((correct / answered) * 100)
 
-    return f"""
+    result = f"""
 ========== Quiz Statistics ==========
 
 Questions Answered : {answered}
@@ -701,9 +709,50 @@ Correct Answers    : {correct}
 Incorrect Answers  : {incorrect}
 
 Accuracy           : {accuracy}%
+"""
 
+    if chatbot.student.quiz_results:
+
+        lesson_stats = {}
+
+        for item in chatbot.student.quiz_results:
+
+            lesson = item["lesson"]
+
+            if lesson not in lesson_stats:
+                lesson_stats[lesson] = {
+                    "answered": 0,
+                    "correct": 0
+                }
+
+            lesson_stats[lesson]["answered"] += 1
+
+            if item["correct"]:
+                lesson_stats[lesson]["correct"] += 1
+
+        result += "\n---------- By Lesson ----------\n"
+
+        for lesson, stats in lesson_stats.items():
+
+            lesson_answered = stats["answered"]
+            lesson_correct = stats["correct"]
+
+            lesson_accuracy = round(
+                (lesson_correct / lesson_answered) * 100
+            )
+
+            result += f"""
+{lesson}
+Questions : {lesson_answered}
+Correct   : {lesson_correct}
+Accuracy  : {lesson_accuracy}%
+"""
+
+    result += """
 ====================================
 """
+
+    return result
 
 def flashcards_command(chatbot):
 
