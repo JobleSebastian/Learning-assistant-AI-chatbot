@@ -123,13 +123,23 @@ def validate_quiz(answer):
     correct_start = answer.find("Correct Answer:")
     explanation_start = answer.find("Explanation:")
 
-    if correct_start == -1: 
+    if correct_start == -1:
         return False
 
-    if explanation_start == -1:  
+    if explanation_start == -1:
         return False
 
     question_part = answer[:correct_start].strip()
+
+    if not question_part.startswith("Question:"):
+        return False
+
+    question_text = question_part[
+        len("Question:"):
+    ].strip()
+
+    if not question_text:
+        return False
 
     correct_part = answer[
         correct_start + len("Correct Answer:"):
@@ -141,13 +151,10 @@ def validate_quiz(answer):
         1
     )[1].strip()
 
-    if not question_part:  
+    if not explanation:
         return False
 
-    if not explanation:   
-        return False
-
-    if correct_part.upper() not in ["A", "B", "C", "D"]:    
+    if correct_part.upper() not in ["A", "B", "C", "D"]:
         return False
 
     lines = question_part.splitlines()
@@ -170,22 +177,20 @@ def validate_quiz(answer):
         elif line.startswith("D."):
             options["D"] = line[2:].strip()
 
-    
-
-    if len(options) != 4:  
+    if len(options) != 4:
         return False
 
     for option in ["A", "B", "C", "D"]:
 
-        if not options[option]:      
+        if not options[option]:
             return False
 
-    if "Follow-up question:" in explanation:     
+    if "Follow-up question:" in explanation:
         return False
 
     if "Follow-up:" in explanation:
         return False
-    
+
     return True
 
 def quiz_command(chatbot):
