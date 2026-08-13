@@ -336,14 +336,43 @@ def progress_command(chatbot):
     if chatbot.student.current_course is None:
         return "No active course."
 
+    total_lessons = len(chatbot.student.course_outline)
+    completed_lessons = len(chatbot.student.completed_lessons)
+
+    if total_lessons > 0:
+        progress = (completed_lessons / total_lessons) * 100
+    else:
+        progress = 0
+
+    if completed_lessons >= total_lessons and total_lessons > 0:
+        status = "Course Completed!"
+
+        return f"""
+========== Progress ==========
+
+Course : {chatbot.student.current_course.title()}
+
+Completed Lessons : {completed_lessons} / {total_lessons}
+
+Progress : {progress:.0f}%
+
+Status : {status}
+
+Quiz Score : {chatbot.student.quiz_score}
+
+==============================
+"""
+
     return f"""
 ========== Progress ==========
 
 Course : {chatbot.student.current_course.title()}
 
+Completed Lessons : {completed_lessons} / {total_lessons}
+
 Current Lesson : {chatbot.student.current_lesson}
 
-Completed Lessons : {len(chatbot.student.completed_lessons)}
+Progress : {progress:.0f}%
 
 Quiz Score : {chatbot.student.quiz_score}
 
@@ -387,9 +416,14 @@ def validate_lesson(answer, lesson_number, lesson_title):
 
 def next_command(chatbot):
 
+    if chatbot.student.current_course is None:
+        return "Start a course first using /learn <topic>."
+
     if chatbot.student.current_lesson > len(
         chatbot.student.course_outline
+        
     ):
+      
         return """
 🎉 Congratulations!
 
@@ -401,9 +435,6 @@ Use
 
 to start another course.
 """
-
-    if chatbot.student.current_course is None:
-        return "Start a course first using /learn <topic>."
 
     lesson_number = chatbot.student.current_lesson
     topic = chatbot.student.current_course
