@@ -22,6 +22,8 @@ class Student:
             "flashcard_history": self.flashcard_history,
             "quiz_results": self.quiz_results,
             "current_quiz_lesson": self.current_quiz_lesson,
+            "flashcard_results": self.flashcard_results,
+            "current_flashcard_lesson": self.current_flashcard_lesson,
             "quiz_history": self.quiz_history
             
         }
@@ -52,6 +54,8 @@ class Student:
             self.review_flashcard_index = data.get("review_flashcard_index", -1)
             self.quiz_history = data.get("quiz_history", [])
             self.flashcard_history = data.get("flashcard_history", [])
+            self.flashcard_results = data.get("flashcard_results", [])
+            self.current_flashcard_lesson = data.get("current_flashcard_lesson", "")
             self.quiz_results = data.get("quiz_results", [])
             self.current_quiz_lesson = data.get("current_quiz_lesson", "")
             
@@ -103,6 +107,10 @@ class Student:
 
         self.flashcard_history = []
 
+        self.flashcard_results = []
+
+        self.current_flashcard_lesson = ""
+
         self.quiz_results = []
 
         self.current_quiz_lesson = ""
@@ -146,3 +154,7 @@ class Student:
         self.quiz_results = []
 
         self.current_quiz_lesson = ""
+
+        self.flashcard_results = []
+
+        self.current_flashcard_lesson = ""

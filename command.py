@@ -757,7 +757,176 @@ Accuracy  : {lesson_accuracy}%
 ====================================
 """
 
+    flashcard_results = chatbot.student.flashcard_results
+
+    flashcard_by_lesson = {}
+
+    for item in flashcard_results:
+
+        lesson = item["lesson"]
+
+        if lesson not in flashcard_by_lesson:
+            flashcard_by_lesson[lesson] = {
+                "cards": 0,
+                "known": 0,
+                "difficult": 0
+            }
+
+        flashcard_by_lesson[lesson]["cards"] += 1
+
+        if item["result"] == "known":
+            flashcard_by_lesson[lesson]["known"] += 1
+
+        elif item["result"] == "difficult":
+            flashcard_by_lesson[lesson]["difficult"] += 1
+
+    flashcard_section = ""
+
+    current_difficult_questions = {
+        flashcard["question"]
+        for flashcard in chatbot.student.difficult_flashcards
+    }
+
+    if flashcard_by_lesson:
+
+        flashcard_section = """
+---------- Flashcard Performance ----------
+"""
+
+        for lesson, stats in flashcard_by_lesson.items():
+
+            cards = stats["cards"]
+            known = stats["known"]
+            difficult = stats["difficult"]
+
+            if cards == 0:
+                known_rate = 0
+            else:
+                known_rate = round((known / cards) * 100)
+
+            current_difficult = len({
+                item["question"]
+                for item in flashcard_results
+                if (
+                    item["lesson"] == lesson
+                    and item["question"] in current_difficult_questions
+                )
+            })
+
+            flashcard_section += f"""
+{lesson}
+Cards Reviewed       : {cards}
+Known                : {known}
+Difficult            : {difficult}
+Currently Difficult  : {current_difficult}
+Known Rate           : {known_rate}%
+"""
+
+        flashcard_section += """
+============================================
+"""
+
+    result += flashcard_section
+
     return result
+
+def get_flashcard_lesson_weights(chatbot):
+
+    weights = []
+
+    for lesson in chatbot.student.completed_lessons:
+
+        # -----------------------------
+        # Flashcard performance
+        # -----------------------------
+
+        flashcard_results = [
+            item
+            for item in chatbot.student.flashcard_results
+            if item["lesson"] == lesson
+        ]
+
+        if not flashcard_results:
+
+            flashcard_weight = 2
+
+        else:
+
+            known = sum(
+                1
+                for item in flashcard_results
+                if item["result"] == "known"
+            )
+
+            difficult = sum(
+                1
+                for item in flashcard_results
+                if item["result"] == "difficult"
+            )
+
+            total = len(flashcard_results)
+
+            known_rate = known / total
+
+            if known_rate >= 0.75:
+
+                flashcard_weight = 1
+
+            elif known_rate >= 0.50:
+
+                flashcard_weight = 3
+
+            else:
+
+                flashcard_weight = 5
+
+        # -----------------------------
+        # Quiz performance
+        # -----------------------------
+
+        quiz_results = [
+            item
+            for item in chatbot.student.quiz_results
+            if item["lesson"] == lesson
+        ]
+
+        if not quiz_results:
+
+            quiz_weight = 2
+
+        else:
+
+            quiz_correct = sum(
+                1
+                for item in quiz_results
+                if item["correct"]
+            )
+
+            quiz_total = len(quiz_results)
+
+            quiz_accuracy = quiz_correct / quiz_total
+
+            if quiz_accuracy >= 0.75:
+
+                quiz_weight = 1
+
+            elif quiz_accuracy >= 0.50:
+
+                quiz_weight = 3
+
+            else:
+
+                quiz_weight = 5
+
+        # -----------------------------
+        # Combined lesson difficulty
+        # -----------------------------
+
+        weight = flashcard_weight + quiz_weight
+
+        weights.append(weight)
+
+    return weights
 
 def flashcards_command(chatbot):
 
@@ -770,9 +939,20 @@ def flashcards_command(chatbot):
     if chatbot.student.flashcard_active:
         return "Flip the current flashcard first using /flip."
 
-    lesson_index = random.randrange(
-        len(chatbot.student.completed_lesson_contents)
-    )
+    if chatbot.student.difficult_flashcards:
+
+        review_probability = 0.60
+
+        if random.random() < review_probability:
+            return review_flashcards_command(chatbot)
+
+    lesson_weights = get_flashcard_lesson_weights(chatbot)
+
+    lesson_index = random.choices(
+        range(len(chatbot.student.completed_lesson_contents)),
+        weights=lesson_weights,
+        k=1
+    )[0]
 
     lesson_title = chatbot.student.completed_lessons[
         lesson_index
@@ -782,7 +962,7 @@ def flashcards_command(chatbot):
         lesson_index
     ]
 
-    recent_flashcard_history = chatbot.student.flashcard_history[-5:]
+    recent_flashcard_history = chatbot.student.flashcard_history
 
     history_text = ""
 
@@ -814,7 +994,7 @@ Rules:
 - Do not introduce information not contained in the lesson.
 - Keep the question simple and clear.
 - The answer must be directly supported by the lesson.
-- Do not repeat or closely rephrase any recent flashcard question.
+- Do not repeat or closely rephrase any previous flashcard question.
 - Prioritize the lesson's main concept, rule, definition, process, or technique.
 - Prefer an important learning point that has not recently been tested when one is available.
 - Do not use a real-world example as the flashcard topic when the lesson contains a more important learning point.
@@ -843,23 +1023,48 @@ Do not include:
 
         answer = chatbot.ask(prompt)
 
-        if validate_flashcard(answer):
-            break
+        if not validate_flashcard(answer):
 
-        if attempt == MAX_FLASHCARD_RETRIES - 1:
-            return (
-                "Flashcard generation failed after "
-                f"{MAX_FLASHCARD_RETRIES} attempts. "
-                "Please use /flashcards again."
-            )
+            if attempt == MAX_FLASHCARD_RETRIES - 1:
+                return (
+                    "Flashcard generation failed after "
+                    f"{MAX_FLASHCARD_RETRIES} attempts. "
+                    "Please use /flashcards again."
+                )
 
-    question_start = answer.find("Question:")
-    answer_start = answer.find("Answer:")    
+            continue
 
-    question = answer[
-        question_start + len("Question:"):
-        answer_start
-    ].strip()
+        question_start = answer.find("Question:")
+        answer_start = answer.find("Answer:")
+
+        question = answer[
+            question_start + len("Question:"):
+            answer_start
+        ].strip()
+
+        if is_duplicate_flashcard(chatbot, question):
+
+            prompt += """
+
+    IMPORTANT:
+    The generated question was already used.
+
+    Generate a DIFFERENT question that tests another important concept
+    from the lesson.
+
+    Do not repeat or closely rephrase any previous flashcard.
+    """
+
+            if attempt == MAX_FLASHCARD_RETRIES - 1:
+                return (
+                    "Flashcard generation failed because "
+                    "a unique question could not be created. "
+                    "Please use /flashcards again."
+                )
+
+            continue
+
+        break
 
     flashcard_answer = answer[
         answer_start + len("Answer:"):
@@ -867,6 +1072,7 @@ Do not include:
 
     chatbot.student.current_flashcard = question
     chatbot.student.current_flashcard_answer = flashcard_answer
+    chatbot.student.current_flashcard_lesson = lesson_title
     chatbot.student.flashcard_active = True
     chatbot.student.flashcard_status = None
 
@@ -916,6 +1122,11 @@ def know_command(chatbot):
         return "No active flashcard. Use /flashcards first."
 
     chatbot.student.flashcard_status = "known"
+    chatbot.student.flashcard_results.append({
+        "question": chatbot.student.current_flashcard,
+        "lesson": chatbot.student.current_flashcard_lesson,
+        "result": "known"
+    })
     chatbot.student.save()
 
     return "✅ Marked as known."
@@ -928,17 +1139,23 @@ def difficult_command(chatbot):
     if chatbot.student.current_flashcard == "":
         return "No active flashcard. Use /flashcards first."
 
-    chatbot.student.flashcard_status = "difficult"
-
     for flashcard in chatbot.student.difficult_flashcards:
 
         if flashcard["question"] == chatbot.student.current_flashcard:
             chatbot.student.save()
             return "📌 Already marked for review."
 
+    chatbot.student.flashcard_status = "difficult"
+    chatbot.student.flashcard_results.append({
+        "question": chatbot.student.current_flashcard,
+        "lesson": chatbot.student.current_flashcard_lesson,
+        "result": "difficult"
+    })
+
     flashcard = {
         "question": chatbot.student.current_flashcard,
-        "answer": chatbot.student.current_flashcard_answer
+        "answer": chatbot.student.current_flashcard_answer,
+        "lesson": chatbot.student.current_flashcard_lesson
     }
 
     chatbot.student.difficult_flashcards.append(flashcard)
@@ -946,6 +1163,19 @@ def difficult_command(chatbot):
     chatbot.student.save()
 
     return "📌 Marked for review."
+
+def is_duplicate_flashcard(chatbot, question):
+
+    question = question.strip().lower()
+
+    for item in chatbot.student.flashcard_history:
+
+        previous_question = item["question"].strip().lower()
+
+        if question == previous_question:
+            return True
+
+    return False
 
 def validate_flashcard(answer):
 
@@ -992,6 +1222,7 @@ def review_flashcards_command(chatbot):
 
     chatbot.student.current_flashcard = flashcard["question"]
     chatbot.student.current_flashcard_answer = flashcard["answer"]
+    chatbot.student.current_flashcard_lesson = flashcard["lesson"]
 
     chatbot.student.flashcard_active = True
     chatbot.student.flashcard_status = None
@@ -1030,6 +1261,12 @@ def known_command(chatbot):
 
     chatbot.student.difficult_flashcards.pop(index)
 
+    chatbot.student.flashcard_results.append({
+        "question": flashcard["question"],
+        "lesson": flashcard["lesson"],
+        "result": "known"
+    })
+
     chatbot.student.flashcard_status = "known"
 
     if chatbot.student.difficult_flashcards:
@@ -1043,6 +1280,7 @@ def known_command(chatbot):
 
         chatbot.student.current_flashcard = next_flashcard["question"]
         chatbot.student.current_flashcard_answer = next_flashcard["answer"]
+        chatbot.student.current_flashcard_lesson = next_flashcard["lesson"]
 
         chatbot.student.flashcard_active = True
         chatbot.student.flashcard_status = None
