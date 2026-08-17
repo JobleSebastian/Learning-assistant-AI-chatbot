@@ -1,5 +1,6 @@
 from prompts import QUIZ_PROMPT, QUALITY_CHECK_PROMPT, LESSON_PROMPT
 import random
+import string
 
 def help_command(chatbot):
 
@@ -962,7 +963,7 @@ def flashcards_command(chatbot):
         lesson_index
     ]
 
-    recent_flashcard_history = chatbot.student.flashcard_history
+    recent_flashcard_history = chatbot.student.flashcard_history[-5:]
 
     history_text = ""
 
@@ -999,6 +1000,13 @@ Rules:
 - Prefer an important learning point that has not recently been tested when one is available.
 - Do not use a real-world example as the flashcard topic when the lesson contains a more important learning point.
 - Do not create a flashcard merely to recall an example, analogy, or exercise detail unless it is itself an important learning point.
+- Distinguish between instructions for an exercise and instructions for the actual skill being taught.
+- Do not generalize a temporary or stationary exercise position into a rule for normal riding.
+- Make sure the answer applies directly to the situation described in the question.
+- Distinguish between an exercise instruction and the actual skill or concept being taught.
+- Do not generalize a temporary condition, exercise setup, or practice instruction into a general rule.
+- Make sure the answer applies directly to the situation described in the question.
+- Do not turn a detail from an example or exercise into a general rule unless the lesson explicitly presents it as a general rule.
 
 Return EXACTLY this format and nothing else:
 
@@ -1042,18 +1050,32 @@ Do not include:
             answer_start
         ].strip()
 
-        if is_duplicate_flashcard(chatbot, question):
+        flashcard_answer = answer[
+            answer_start + len("Answer:"):
+        ].strip()
 
-            prompt += """
+        if is_duplicate_flashcard(
+            chatbot,
+            question,
+            lesson_title
+        ):
 
-    IMPORTANT:
-    The generated question was already used.
+            prompt += f"""
 
-    Generate a DIFFERENT question that tests another important concept
-    from the lesson.
+IMPORTANT:
+The generated question below was rejected because it is too similar
+to a previous flashcard:
 
-    Do not repeat or closely rephrase any previous flashcard.
-    """
+Rejected question:
+{question}
+
+Generate a DIFFERENT question that tests another important concept
+from the lesson.
+
+Do not repeat or closely rephrase the rejected question.
+Do not test the same learning point using different wording.
+Choose a different learning point from the lesson if one is available.
+"""
 
             if attempt == MAX_FLASHCARD_RETRIES - 1:
                 return (
@@ -1064,11 +1086,31 @@ Do not include:
 
             continue
 
-        break
+        if is_poor_flashcard(question, flashcard_answer):
 
-    flashcard_answer = answer[
-        answer_start + len("Answer:"):
-    ].strip()
+            prompt += """
+
+IMPORTANT:
+The generated flashcard has a poor question-answer relationship.
+The question gives away too much of the answer or is too similar
+to the answer itself.
+
+Generate a clearer question that tests the learning point without
+repeating the answer in the question.
+
+Do not change the underlying learning point.
+"""
+
+            if attempt == MAX_FLASHCARD_RETRIES - 1:
+                return (
+                    "Flashcard generation failed because "
+                    "a high-quality question could not be created. "
+                    "Please use /flashcards again."
+                )
+
+            continue
+
+        break
 
     chatbot.student.current_flashcard = question
     chatbot.student.current_flashcard_answer = flashcard_answer
@@ -1164,16 +1206,167 @@ def difficult_command(chatbot):
 
     return "📌 Marked for review."
 
-def is_duplicate_flashcard(chatbot, question):
+COMMON_QUESTION_WORDS = {
+    "what",
+    "when",
+    "where",
+    "which",
+    "who",
+    "why",
+    "how",
+    "is",
+    "are",
+    "was",
+    "were",
+    "do",
+    "does",
+    "did",
+    "should",
+    "can",
+    "could",
+    "would",
+    "the",
+    "a",
+    "an",
+    "of",
+    "to",
+    "in",
+    "for",
+    "on",
+    "your",
+    "you"
+}
 
-    question = question.strip().lower()
+def are_similar_questions(question1, question2):
+
+    words1 = set(normalize_question(question1).split())
+    words2 = set(normalize_question(question2).split())
+
+    words1 -= COMMON_QUESTION_WORDS
+    words2 -= COMMON_QUESTION_WORDS
+
+    if not words1 or not words2:
+        return False
+
+    common_words = words1.intersection(words2)
+    total_words = words1.union(words2)
+
+    similarity = len(common_words) / len(total_words)
+
+    return similarity >= 0.65
+
+def normalize_question(question):
+
+    question = question.lower().strip()
+
+    question = question.translate(
+        str.maketrans("", "", string.punctuation)
+    )
+
+    question = " ".join(question.split())
+
+    return question
+
+def is_duplicate_flashcard(chatbot, question, lesson_title):
 
     for item in chatbot.student.flashcard_history:
 
-        previous_question = item["question"].strip().lower()
+        if item["lesson"] != lesson_title:
+            continue
 
-        if question == previous_question:
+        previous_question = item["question"]
+
+        if normalize_question(question) == normalize_question(
+            previous_question
+        ):
             return True
+
+        if are_similar_questions(
+            question,
+            previous_question
+        ):
+            return True
+
+    return False
+
+def is_semantic_duplicate(chatbot, question, lesson_title):
+
+    previous_questions = [
+        item["question"]
+        for item in chatbot.student.flashcard_history
+        if item["lesson"] == lesson_title
+    ]
+
+    if not previous_questions:
+        return False
+
+    history_text = ""
+
+    for previous_question in previous_questions:
+        history_text += f"- {previous_question}\n"
+
+    prompt = f"""
+You are checking whether a newly generated flashcard
+tests the same learning concept as any previous flashcard.
+
+New Question:
+{question}
+
+Previous Flashcard Questions:
+{history_text}
+
+Determine whether the new question tests essentially the
+same learning concept as any previous question.
+
+Examples:
+
+"Why is footwork important in batting?"
+"What is the purpose of footwork in batting?"
+=> DUPLICATE
+
+"When should you use a lower gear?"
+"What should you do when riding on rough terrain?"
+=> DUPLICATE if they test the same gear-selection concept.
+
+"What should you do to maintain steady control while avoiding obstacles?"
+"What should you do to stay focused while avoiding obstacles?"
+=> NOT DUPLICATE if they test different learning points.
+
+Return EXACTLY one word:
+
+DUPLICATE
+
+or
+
+UNIQUE
+
+Do not provide an explanation.
+"""
+
+    result = chatbot.ask(prompt)
+
+    return result.strip().upper().startswith("DUPLICATE")
+
+def is_poor_flashcard(question, answer):
+
+    normalized_question = normalize_question(question)
+    normalized_answer = normalize_question(answer)
+
+    if normalized_question == normalized_answer:
+        return True
+
+    question_words = set(normalized_question.split())
+    answer_words = set(normalized_answer.split())
+
+    if not question_words or not answer_words:
+        return False
+
+    overlap = len(
+        question_words.intersection(answer_words)
+    ) / len(question_words)
+
+    if overlap >= 0.70:
+        return True
 
     return False
 
