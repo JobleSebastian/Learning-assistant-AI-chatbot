@@ -10,7 +10,7 @@ Rules:
 """
 
 QUIZ_PROMPT = """
-You are an expert teacher creating a multiple-choice quiz question.
+You are an expert teacher creating ONE multiple-choice quiz question for a beginner.
 
 Course:
 {topic}
@@ -21,55 +21,45 @@ Lesson:
 Lesson Content:
 {lesson_content}
 
-Recent Quiz Questions:
+Previous Quiz Questions:
 {quiz_history}
 
-Create ONE multiple-choice question based ONLY on the lesson content provided above.
+Create ONE question based ONLY on the lesson content.
 
 Rules:
 
-- Base the entire question, all options, and the explanation ONLY on the lesson content provided above.
-- The correct answer MUST be explicitly stated in the lesson content or directly demonstrated by it.
-- Do NOT use outside knowledge, even if you know the information is true.
-- Do NOT correct, expand, reinterpret, or contradict the lesson content.
-- Do NOT introduce facts, rules, numbers, definitions, examples, terminology, or procedures that are not supported by the lesson content.
-- Do NOT ask about information that is missing from the lesson.
-- Make sure exactly ONE option is supported as correct by the lesson content.
-- The three incorrect options must not be supported as correct by the lesson content.
-- Do not make an incorrect option correct using outside knowledge.
-- The explanation must justify the correct answer using ONLY the lesson content.
-- Do not repeat or closely rephrase any recent quiz question.
-- Prefer a different important learning point when one is available.
-- If the recent questions already cover several learning points from this lesson, choose an uncovered important learning point when possible.
+CONTENT
+- Use only information explicitly stated or directly demonstrated in the lesson.
+- Do not use outside knowledge or add, correct, reinterpret, or expand lesson information.
+- The explanation must also be supported only by the lesson.
 
-Question selection:
+UNIQUENESS
+- Do not test the same learning point as a previous quiz question, even with different wording.
+- Review previous questions and prefer an important learning point that has not been tested.
+- Do not repeatedly test the same fact, instruction, procedure, or concept.
+- Prefer important concepts, rules, definitions, techniques, and meaningful procedures over minor exercise details.
+- Do not use a practical exercise detail if the same learning point was already tested in the main lesson.
 
-- First identify the main learning points covered in the lesson.
-- Prefer testing an important learning point rather than an incidental detail.
-- Prefer the main concept, rule, definition, process, or technique taught in the lesson.
-- The question should test something meaningful that the student could learn from the lesson.
-- Use practical exercise details only when they represent an important learning point or procedure.
-- Avoid focusing on minor numbers, distances, repetition counts, or other incidental exercise details when the lesson contains more important concepts.
-- Vary the question style when the lesson content allows it.
-- Questions may test:
-  - understanding of a concept,
-  - identification of a correct statement,
-  - distinction between two concepts,
-  - application of a technique or procedure explicitly described in the lesson,
-  - or an important practical instruction.
-- When several important learning points are available, prefer one that is different from the most obvious or repeatedly testable detail of the lesson.
-- Do not make the question artificially difficult or rely on wording tricks or obscure details.
-- Do not begin with generic phrases such as "What is a key part...", "What equipment is identified...", or "What is the setup..." when a more direct question about the main learning point is possible.
+ONE CORRECT ANSWER
+- Exactly ONE option must be supported as correct by the lesson.
+- Before finalizing, check every option against the lesson content.
+- If two or more options could be correct, create a different question.
+- Do not use wording to make an otherwise valid option artificially incorrect.
+- When the lesson contains multiple valid methods or answers, ask about the complete set or a specific detail that has only one correct answer.
+- Avoid questions such as "a way", "one way", or "a method" when multiple valid answers exist.
 
-Options:
+QUESTION QUALITY
+- Keep the question clear, direct, and appropriate for a beginner.
+- Test understanding, identification, distinction, or application of an important lesson point.
+- Prefer general learning points over incidental examples unless the example itself teaches an important rule.
+- Avoid obscure details, wording tricks, or unsupported assumptions.
+- Make distractors plausible and relevant, but clearly unsupported by the lesson.
+- Do not make the correct option noticeably longer or more detailed than the distractors.
+- Vary the question style and correct-answer position when possible.
 
-- Make incorrect options plausible and relevant to the lesson topic.
-- Incorrect options must remain unsupported as correct by the lesson content.
-- Do not require outside knowledge to distinguish the correct option from the incorrect options.
-- Avoid obviously unrelated distractors unless the lesson itself discusses them.
-- Do not make the correct option noticeably longer, more detailed, or more specific than the other options merely to reveal the answer.
+OUTPUT
 
-Return exactly this format:
+Return exactly:
 
 Question:
 
@@ -81,16 +71,11 @@ D.
 Correct Answer: <A/B/C/D>
 
 Explanation:
-Write 1-2 complete sentences explaining why the correct answer is supported by the lesson content.
+<1-2 sentences explaining why the correct answer is supported by the lesson.>
 
-IMPORTANT:
-
-- The explanation MUST NOT be empty.
-- The explanation MUST be based only on the lesson content.
-- Stop immediately after the explanation.
-- Do NOT add a follow-up question.
-- Do NOT add "Follow-up question:".
-- Do NOT add any text after the explanation.
+Do not include anything else.
+Do not include a follow-up question.
+Do not include "Follow-up:" or "Follow-up question:".
 """
 
 QUALITY_CHECK_PROMPT = """
@@ -128,6 +113,7 @@ Check for:
 - Verify that the stated conditions, outcome, and procedure are accurate, especially for scoring, penalties, fouls, and restarts of play.
 - Do not accept a rule merely because it sounds plausible.
 - If a lesson explains a rule, make sure the explanation does not materially change the meaning of the actual rule.
+
 
 Do NOT flag:
 

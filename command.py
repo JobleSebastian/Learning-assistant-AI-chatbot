@@ -119,6 +119,77 @@ Course Outline
 Type /next to begin.
 """
 
+def is_duplicate_quiz(chatbot, question, lesson_title):
+
+    for item in chatbot.student.quiz_history:
+
+        if isinstance(item, dict):
+
+            if item["lesson"] != lesson_title:
+                continue
+
+            previous_question = item["question"]
+
+        else:
+            previous_question = item
+
+        if normalize_question(question) == normalize_question(
+            previous_question
+        ):
+            return True
+
+        if are_similar_questions(
+            question,
+            previous_question
+        ):
+            return True
+
+    return False
+
+def extract_quiz_question_text(answer):
+
+    correct_start = answer.find("Correct Answer:")
+
+    if correct_start == -1:
+        return ""
+
+    question_part = answer[:correct_start].strip()
+
+    if not question_part.startswith("Question:"):
+        return ""
+
+    question_part = question_part[
+        len("Question:"):
+    ].strip()
+
+    lines = []
+
+    for line in question_part.splitlines():
+
+        line = line.strip()
+
+        if line.startswith(("A.", "B.", "C.", "D.")):
+            continue
+
+        if line:
+            lines.append(line)
+
+    return " ".join(lines).strip()
+
+def extract_quiz_question(answer):
+
+    correct_start = answer.find("Correct Answer:")
+
+    if correct_start == -1:
+        return ""
+
+    question_part = answer[:correct_start].strip()
+
+    if not question_part.startswith("Question:"):
+        return ""
+
+    return question_part
+
 def validate_quiz(answer):
 
     correct_start = answer.find("Correct Answer:")
@@ -140,6 +211,9 @@ def validate_quiz(answer):
     ].strip()
 
     if not question_text:
+        return False
+
+    if question_text.startswith(("A.", "B.", "C.", "D.")):
         return False
 
     correct_part = answer[
@@ -186,6 +260,16 @@ def validate_quiz(answer):
         if not options[option]:
             return False
 
+    normalized_options = [
+        normalize_question(options["A"]),
+        normalize_question(options["B"]),
+        normalize_question(options["C"]),
+        normalize_question(options["D"])
+    ]
+
+    if len(set(normalized_options)) != 4:
+        return False    
+
     if "Follow-up question:" in explanation:
         return False
 
@@ -205,9 +289,9 @@ def quiz_command(chatbot):
     lesson_index = random.randrange(
         len(chatbot.student.completed_lessons)
     )
-    
+
     lesson_title = chatbot.student.completed_lessons[
-    lesson_index
+        lesson_index
     ]
 
     lesson_content = chatbot.student.completed_lesson_contents[
@@ -230,13 +314,23 @@ def quiz_command(chatbot):
             lesson_index
         ]
 
-    recent_quiz_history = chatbot.student.quiz_history[-5:]
+    recent_quiz_history = chatbot.student.quiz_history
 
     history_text = ""
 
     for item in recent_quiz_history:
-        history_text += f"- {item}\n"        
 
+        if isinstance(item, dict):
+            history_text += (
+                f"- Question: {item['question']}\n"
+                f"  Lesson: {item['lesson']}\n"
+            )
+
+        else:
+            history_text += (
+                f"- Question: {item}\n"
+                f"  Lesson: Unknown\n"
+            )
 
     prompt = QUIZ_PROMPT.format(
         topic=chatbot.student.current_course,
@@ -251,16 +345,53 @@ def quiz_command(chatbot):
 
         answer = chatbot.ask(prompt)
 
+        if not validate_quiz(answer):
 
-        if validate_quiz(answer):
-            break
+            if attempt == MAX_QUIZ_RETRIES - 1:
+                return (
+                    "Quiz generation failed after "
+                    f"{MAX_QUIZ_RETRIES} attempts. "
+                    "Please use /quiz again."
+                )
 
-        if attempt == MAX_QUIZ_RETRIES - 1:
-            return (
-                "Quiz generation failed after "
-                f"{MAX_QUIZ_RETRIES} attempts. "
-                "Please use /quiz again."
-            )
+            continue
+
+        question = extract_quiz_question(answer)
+        question_text = extract_quiz_question_text(answer)
+
+        if is_duplicate_quiz(
+            chatbot,
+            question_text,
+            lesson_title
+        ):
+
+            prompt += f"""
+
+    IMPORTANT:
+
+    The generated question was already used or is too similar
+    to a previous quiz question.
+
+    Rejected question:
+    {question_text}
+
+    Generate a DIFFERENT question that tests another important
+    learning point from the lesson.
+
+    Do not repeat or closely rephrase the rejected question.
+    Choose a different learning point when one is available.
+    """
+
+            if attempt == MAX_QUIZ_RETRIES - 1:
+                return (
+                    "Quiz generation failed because "
+                    "a unique question could not be created. "
+                    "Please use /quiz again."
+                )
+
+            continue
+
+        break
 
     chatbot.student.last_quiz_lesson = lesson_title
     chatbot.student.current_quiz_lesson = lesson_title
@@ -283,10 +414,12 @@ def quiz_command(chatbot):
 
     chatbot.student.current_question = answer
     chatbot.student.quiz_active = True
-    
-    question = answer[:correct_start].strip()
 
-    chatbot.student.quiz_history.append(question)
+    chatbot.student.quiz_history.append({
+    "question": question_text,
+    "lesson": lesson_title
+    })
+
     chatbot.student.save()
 
     return question
