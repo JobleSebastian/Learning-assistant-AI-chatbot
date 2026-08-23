@@ -2,6 +2,7 @@ from ollama import chat
 from prompts import SYSTEM_PROMPT
 from student import Student
 from command import execute
+import time
 
 class LearningChatbot:
 
@@ -22,6 +23,21 @@ class LearningChatbot:
                 "content": self.system_prompt
             }
         ]
+
+    def ask_once(self, prompt):
+
+        response = chat(
+            model=self.model,
+            messages=[
+                {
+                    "role": "user",
+                    "content": prompt
+                }
+            ],
+            think=False
+        )
+
+        return response.message.content
 
     def ask(self, question):
 

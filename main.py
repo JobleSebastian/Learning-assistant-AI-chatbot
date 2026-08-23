@@ -1,9 +1,10 @@
 import chatbot
-print(chatbot.__file__)
 from chatbot import LearningChatbot
 
+print(chatbot.__file__)
 
 bot = LearningChatbot()
+
 bot.student.save()
 
 print("=" * 40)
@@ -20,9 +21,9 @@ while True:
         break
 
     if question.startswith("/"):
-     answer = bot.command(question)
+        answer = bot.command(question)
     else:
-     answer = bot.ask(question)
+        answer = bot.ask(question)
 
     print("\nTutor:")
     print(answer)

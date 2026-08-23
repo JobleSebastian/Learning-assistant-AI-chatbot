@@ -9,6 +9,52 @@ Rules:
 5. Be patient and encouraging.
 """
 
+LEARNING_POINT_PROMPT = """
+You are an expert teacher analyzing a beginner lesson.
+
+Course:
+{topic}
+
+Lesson:
+{lesson_title}
+
+Lesson Content:
+{lesson_content}
+
+Extract ALL distinct main learning points from this lesson.
+
+A learning point must be:
+- an important rule, concept, definition, component function,
+  technique, or safety instruction
+- explicitly supported by the lesson
+- something that can reasonably be tested with ONE quiz question
+
+Do NOT include:
+- examples
+- demonstrations
+- practical exercise steps
+- incidental details
+- repeated or overlapping concepts
+- information not stated in the lesson
+
+Each learning point must represent ONE distinct concept.
+
+The number of learning points may vary. Some lessons may have
+only 2, while others may have 3, 4, or more.
+
+Do not invent learning points just to increase the number.
+
+Return ONLY this format:
+
+Learning Point 1:
+<short learning point>
+
+Learning Point 2:
+<short learning point>
+
+Continue only while genuinely distinct learning points remain.
+"""
+
 QUIZ_PROMPT = """
 You are an expert teacher creating ONE multiple-choice quiz question for a beginner.
 
@@ -21,61 +67,111 @@ Lesson:
 Lesson Content:
 {lesson_content}
 
-Previous Quiz Questions:
+Available Learning Points:
 {quiz_history}
+
+The available learning points listed below are the ONLY learning
+points that may be tested.
+
+Choose exactly ONE of them.
+
+Do not create a new learning point.
+Do not combine multiple learning points.
 
 Create ONE question based ONLY on the lesson content.
 
 Rules:
 
+LEARNING POINT PRIORITY
+
+First identify the important main-lesson concepts in the lesson.
+
+A main-lesson concept is a rule, definition, component function,
+technique, or safety instruction that teaches the learner something
+important.
+
+Do NOT create a question from:
+- practical exercise steps
+- examples
+- demonstrations
+- sequences of an exercise
+- incidental details
+
+while any important main-lesson concept remains untested.
+
+If the lesson has only a small number of main-lesson concepts,
+do not invent additional concepts.
+
 CONTENT
 - Use only information explicitly stated or directly demonstrated in the lesson.
-- Do not use outside knowledge or add, correct, reinterpret, or expand lesson information.
-- The explanation must also be supported only by the lesson.
+- Do not use outside knowledge or add, correct, reinterpret, or expand the lesson.
+- The question, options, correct answer, and explanation must all be supported by the lesson.
+- Preserve important conditions and relationships when paraphrasing; do not change the meaning.
 
 UNIQUENESS
-- Do not test the same learning point as a previous quiz question, even with different wording.
-- Review previous questions and prefer an important learning point that has not been tested.
-- Do not repeatedly test the same fact, instruction, procedure, or concept.
-- Prefer important concepts, rules, definitions, techniques, and meaningful procedures over minor exercise details.
-- Do not use a practical exercise detail if the same learning point was already tested in the main lesson.
+- Do not test the same underlying learning point as a previous question, even with different wording.
+- Review both the previous questions AND their Learning Points.
+- Choose an important learning point that has not already been tested.
+- Treat different wording as the same if it tests the same underlying fact, rule, technique, or concept.
+- Prioritize main lesson concepts over examples, minor details, and practical exercises.
+- Do not use a practical exercise while an important main-lesson learning point remains untested.
+- Use practical exercise content only after the important main-lesson concepts are exhausted.
+- Each question should primarily test ONE learning point.
+- Do not combine two separate rules, techniques, or facts in the same question.
+- The explanation should explain only the learning point being tested.
 
 ONE CORRECT ANSWER
 - Exactly ONE option must be supported as correct by the lesson.
-- Before finalizing, check every option against the lesson content.
-- If two or more options could be correct, create a different question.
-- Do not use wording to make an otherwise valid option artificially incorrect.
-- When the lesson contains multiple valid methods or answers, ask about the complete set or a specific detail that has only one correct answer.
-- Avoid questions such as "a way", "one way", or "a method" when multiple valid answers exist.
+- Check every option against the lesson before finalizing.
+- If multiple options could be correct, create a different question.
+- Do not make a valid option incorrect through wording alone.
+- When multiple valid answers exist, ask for the complete set or a distinguishing detail with only one correct answer.
+- Avoid "a way", "one way", "a method", or similar wording when multiple answers are valid.
+- Do not use "All of the above" or "None of the above".
 
 QUESTION QUALITY
-- Keep the question clear, direct, and appropriate for a beginner.
+- Keep the question clear, direct, and beginner-friendly.
 - Test understanding, identification, distinction, or application of an important lesson point.
-- Prefer general learning points over incidental examples unless the example itself teaches an important rule.
-- Avoid obscure details, wording tricks, or unsupported assumptions.
-- Make distractors plausible and relevant, but clearly unsupported by the lesson.
+- Prefer rules, concepts, definitions, techniques, and meaningful procedures.
+- Avoid examples, incidental details, obscure details, wording tricks, and unsupported assumptions.
+- Make distractors plausible and relevant, but unsupported by the lesson.
 - Do not make the correct option noticeably longer or more detailed than the distractors.
-- Vary the question style and correct-answer position when possible.
+- Vary the correct-answer position when reasonably possible.
+- Do not change the question, options, or wording merely to force a particular correct-answer position.
+
+LEARNING POINT
+- Identify exactly ONE learning point being tested.
+- The learning point must be explicitly supported by the lesson.
+- Do not combine multiple lesson concepts.
+- Keep it short and specific.
+- Two questions testing the same underlying fact or rule must use essentially the same learning point.
 
 OUTPUT
 
-Return exactly:
+Return exactly this format:
 
 Question:
+<question>
 
-A.
-B.
-C.
-D.
+A. <option>
+B. <option>
+C. <option>
+D. <option>
 
 Correct Answer: <A/B/C/D>
 
+Learning Point:
+<short description of the single concept being tested>
+
 Explanation:
-<1-2 sentences explaining why the correct answer is supported by the lesson.>
+<1-2 sentences>
 
 Do not include anything else.
 Do not include a follow-up question.
 Do not include "Follow-up:" or "Follow-up question:".
+Correct Answer must contain ONLY A, B, C, or D.
+Do not include the option text after Correct Answer.
+Do not use Markdown bold.
 """
 
 QUALITY_CHECK_PROMPT = """

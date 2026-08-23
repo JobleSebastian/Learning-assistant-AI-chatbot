@@ -24,6 +24,7 @@ class Student:
             "current_quiz_lesson": self.current_quiz_lesson,
             "flashcard_results": self.flashcard_results,
             "current_flashcard_lesson": self.current_flashcard_lesson,
+            "lesson_learning_points": self.lesson_learning_points,
             "quiz_history": self.quiz_history
             
         }
@@ -57,6 +58,7 @@ class Student:
             self.flashcard_results = data.get("flashcard_results", [])
             self.current_flashcard_lesson = data.get("current_flashcard_lesson", "")
             self.quiz_results = data.get("quiz_results", [])
+            self.lesson_learning_points = data.get("lesson_learning_points",{})
             self.current_quiz_lesson = data.get("current_quiz_lesson", "")
             
         except FileNotFoundError:
@@ -115,6 +117,8 @@ class Student:
 
         self.current_quiz_lesson = ""
 
+        self.lesson_learning_points = {}
+
         self.streak = 0
 
     def reset_course(self):
@@ -158,3 +162,5 @@ class Student:
         self.flashcard_results = []
 
         self.current_flashcard_lesson = ""
+
+        self.lesson_learning_points = {}

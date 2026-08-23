@@ -1,6 +1,10 @@
-from prompts import QUIZ_PROMPT, QUALITY_CHECK_PROMPT, LESSON_PROMPT
+from prompts import QUIZ_PROMPT, QUALITY_CHECK_PROMPT, LESSON_PROMPT, LEARNING_POINT_PROMPT
 import random
 import string
+import time
+import re
+
+print(">>> LOADED extract_learning_points FROM:", __file__)
 
 def help_command(chatbot):
 
@@ -119,30 +123,168 @@ Course Outline
 Type /next to begin.
 """
 
-def is_duplicate_quiz(chatbot, question, lesson_title):
+def normalize_question(question):
+
+    question = question.lower().strip()
+
+    question = question.translate(
+        str.maketrans("", "", string.punctuation)
+    )
+
+    question = " ".join(question.split())
+
+    return question
+
+def normalize_learning_point(text):
+    text = text.lower().strip()
+
+    text = text.translate(
+        str.maketrans("", "", string.punctuation)
+    )
+
+    text = " ".join(text.split())
+
+    return text
+
+def extract_learning_points(chatbot, topic, lesson_title, lesson_content):
+
+    prompt = LEARNING_POINT_PROMPT.format(
+        topic=topic,
+        lesson_title=lesson_title,
+        lesson_content=lesson_content
+    )
+
+    answer = chatbot.ask_once(prompt)
+
+    learning_points = []
+
+    lines = answer.splitlines()
+
+    for i, line in enumerate(lines):
+
+        line = line.strip()
+
+        if line.startswith("Learning Point") and ":" in line:
+
+            if i + 1 < len(lines):
+
+                point = lines[i + 1].strip()
+
+                if point:
+                    learning_points.append(point)
+
+    return learning_points
+
+def test_learning_point_extraction(chatbot):
+
+    lesson_title = chatbot.student.completed_lessons[1]
+
+    lesson_index = chatbot.student.completed_lessons.index(
+        lesson_title
+    )
+
+    lesson_content = chatbot.student.completed_lesson_contents[
+        lesson_index
+    ]
+
+    points = extract_learning_points(
+        chatbot,
+        chatbot.student.current_course,
+        lesson_title,
+        lesson_content
+    )
+
+    print("\n========== LEARNING POINT TEST ==========")
+    print("Lesson:", lesson_title)
+    print("Number of points:", len(points))
+
+    for i, point in enumerate(points, 1):
+        print(f"{i}. {point}")
+
+    print("=========================================")
+
+def is_duplicate_quiz(
+    chatbot,
+    question,
+    lesson_title,
+    learning_point=None
+):
+
+    normalized_question = normalize_question(question)
 
     for item in chatbot.student.quiz_history:
 
-        if isinstance(item, dict):
+        if not isinstance(item, dict):
+            continue
 
-            if item["lesson"] != lesson_title:
-                continue
+        if item.get("lesson") != lesson_title:
+            continue
 
-            previous_question = item["question"]
+        previous_question = item.get("question", "")
+        previous_learning_point = item.get(
+            "learning_point",
+            ""
+        )
 
-        else:
-            previous_question = item
+        # Question duplicate
+        if previous_question:
 
-        if normalize_question(question) == normalize_question(
-            previous_question
-        ):
-            return True
+            if normalized_question == normalize_question(
+                previous_question
+            ):
+                print(
+                    "DUPLICATE REASON: "
+                    "EXACT QUESTION"
+                )
+                print(
+                    "CURRENT:",
+                    question
+                )
+                print(
+                    "PREVIOUS:",
+                    previous_question
+                )
+                return True
 
-        if are_similar_questions(
-            question,
-            previous_question
-        ):
-            return True
+        # Learning-point duplicate
+        if learning_point and previous_learning_point:
+
+            current_lp = normalize_learning_point(
+                learning_point
+            )
+
+            previous_lp = normalize_learning_point(
+                previous_learning_point
+            )
+
+            if current_lp == previous_lp:
+                print("DUPLICATE REASON: EXACT LEARNING POINT")
+                return True
+
+            # Detect same concept with different wording
+            current_words = set(current_lp.split())
+            previous_words = set(previous_lp.split())
+
+            common_words = (
+                current_words.intersection(previous_words)
+            )
+
+            if len(common_words) >= 3:
+
+                print(
+                    "DUPLICATE REASON: "
+                    "SIMILAR LEARNING POINT"
+                )
+                print(
+                    "CURRENT LP:",
+                    learning_point
+                )
+                print(
+                    "PREVIOUS LP:",
+                    previous_learning_point
+                )
+
+                return True
 
     return False
 
@@ -190,95 +332,209 @@ def extract_quiz_question(answer):
 
     return question_part
 
+def validate_quiz_semantics(chatbot, answer, lesson_content):
+    prompt = f"""
+You are validating a multiple-choice quiz question.
+
+Lesson Content:
+{lesson_content}
+
+Quiz:
+{answer}
+
+Determine whether the quiz is logically valid according to ONLY
+the lesson content.
+
+Requirements:
+- Exactly one option must be supported as correct.
+- The stated correct answer must actually be correct.
+- No other option may also be independently correct.
+- Do not use outside knowledge.
+- Ignore whether the formatting is correct.
+
+Return EXACTLY one word:
+
+VALID
+
+or
+
+INVALID
+"""
+
+    result = chatbot.ask(prompt)
+
+    return result.strip().upper() == "VALID"
+
 def validate_quiz(answer):
 
     correct_start = answer.find("Correct Answer:")
+    learning_start = answer.find("Learning Point:")
     explanation_start = answer.find("Explanation:")
 
     if correct_start == -1:
         return False
 
+    if learning_start == -1:
+        return False
+
     if explanation_start == -1:
         return False
 
-    question_part = answer[:correct_start].strip()
-
-    if not question_part.startswith("Question:"):
-        return False
-
-    question_text = question_part[
-        len("Question:"):
+    # Correct Answer must be between Correct Answer and Learning Point
+    correct = answer[
+        correct_start + len("Correct Answer:"):
+        learning_start
     ].strip()
 
-    if not question_text:
+    if correct not in ["A", "B", "C", "D"]:
         return False
 
-    if question_text.startswith(("A.", "B.", "C.", "D.")):
-        return False
-
-    correct_part = answer[
-        correct_start + len("Correct Answer:"):
+    # Learning Point must contain something
+    learning_point = answer[
+        learning_start + len("Learning Point:"):
         explanation_start
     ].strip()
 
-    explanation = answer.split(
-        "Explanation:",
-        1
-    )[1].strip()
+    if not learning_point:
+        return False
+
+    # Explanation must contain something
+    explanation = answer[
+        explanation_start + len("Explanation:"):
+    ].strip()
 
     if not explanation:
         return False
 
-    if correct_part.upper() not in ["A", "B", "C", "D"]:
-        return False
-
-    lines = question_part.splitlines()
-
-    options = {}
-
-    for line in lines:
-
-        line = line.strip()
-
-        if line.startswith("A."):
-            options["A"] = line[2:].strip()
-
-        elif line.startswith("B."):
-            options["B"] = line[2:].strip()
-
-        elif line.startswith("C."):
-            options["C"] = line[2:].strip()
-
-        elif line.startswith("D."):
-            options["D"] = line[2:].strip()
-
-    if len(options) != 4:
-        return False
-
-    for option in ["A", "B", "C", "D"]:
-
-        if not options[option]:
-            return False
-
-    normalized_options = [
-        normalize_question(options["A"]),
-        normalize_question(options["B"]),
-        normalize_question(options["C"]),
-        normalize_question(options["D"])
-    ]
-
-    if len(set(normalized_options)) != 4:
-        return False    
-
-    if "Follow-up question:" in explanation:
-        return False
-
-    if "Follow-up:" in explanation:
-        return False
-
     return True
 
+MAX_QUESTIONS_PER_LESSON = 5
+
+def choose_quiz_lesson(chatbot):
+
+    lessons = chatbot.student.completed_lessons
+
+    if not lessons:
+        return None
+
+    lesson_counts = {
+        lesson: get_lesson_quiz_count(
+            chatbot,
+            lesson
+        )
+        for lesson in lessons
+    }
+
+    available_lessons = [
+        lesson
+        for lesson in lessons
+        if lesson_counts[lesson] < MAX_QUESTIONS_PER_LESSON
+    ]
+
+    if not available_lessons:
+        return None
+
+    if (
+        len(available_lessons) > 1
+        and chatbot.student.last_quiz_lesson in available_lessons
+    ):
+        available_lessons.remove(
+            chatbot.student.last_quiz_lesson
+        )
+
+    return random.choice(available_lessons)
+
+def get_lesson_quiz_count(chatbot, lesson_title):
+
+    count = 0
+
+    for item in chatbot.student.quiz_history:
+
+        if isinstance(item, dict):
+            if item.get("lesson") == lesson_title:
+                count += 1
+
+    return count
+
+def get_lesson_learning_points(lesson_title):
+
+    if lesson_title == "Identify bike components: pedals, handlebars, brakes, gears":
+        return [
+            "pedals",
+            "handlebars",
+            "brakes",
+            "gears"
+        ]
+
+    elif lesson_title == "Balance without moving using feet on the ground":
+        return [
+            "feet on ground",
+            "body centered",
+            "weight adjustment",
+            "relaxed hands",
+            "upright posture"
+        ]
+
+    elif lesson_title == "Push off and pedal smoothly to move forward":
+        return [
+            "push off",
+            "placing foot on pedal",
+            "relaxed legs",
+            "circular pedaling",
+            "steady rhythm",
+            "upright body"
+        ]
+
+    elif lesson_title == "Practice steering by turning handlebars gently":
+        return [
+            "handlebar direction",
+            "gentle handlebar movement",
+            "centered body",
+            "avoid jerking",
+            "smooth movements",
+            "look ahead"
+        ]
+
+    elif lesson_title == "Learn to apply brakes safely without skidding":
+        return [
+            "gradual braking",
+            "even brake pressure",
+            "front brake",
+            "rear brake",
+            "body centered",
+            "avoid sudden braking",
+            "look ahead"
+        ]
+
+    return []
+
+def clean_quiz_format(text):
+
+    text = text.replace("**", "")
+
+    text = re.sub(
+        r"^\s*Options:\s*$",
+        "",
+        text,
+        flags=re.MULTILINE | re.IGNORECASE
+    )
+
+    text = re.sub(
+        r"^\s*Answer:\s*",
+        "Correct Answer: ",
+        text,
+        flags=re.MULTILINE | re.IGNORECASE
+    )
+
+    return text.strip()
+
 def quiz_command(chatbot):
+
+    if chatbot.student.quiz_active:
+        return (
+            "You already have an active quiz. "
+            "Answer it before starting another quiz."
+        )
 
     if chatbot.student.current_course is None:
         return "Start a course first using /learn <topic>."
@@ -286,66 +542,113 @@ def quiz_command(chatbot):
     if chatbot.student.current_lesson == 1:
         return "Complete the first lesson before taking a quiz."
 
-    lesson_index = random.randrange(
-        len(chatbot.student.completed_lessons)
-    )
+    lesson_title = choose_quiz_lesson(chatbot)
 
-    lesson_title = chatbot.student.completed_lessons[
-        lesson_index
-    ]
+    if lesson_title is None:
+        return (
+            "All completed lessons have reached "
+            f"{MAX_QUESTIONS_PER_LESSON} quiz questions."
+        )
+
+    lesson_index = chatbot.student.completed_lessons.index(
+        lesson_title
+    )
 
     lesson_content = chatbot.student.completed_lesson_contents[
         lesson_index
     ]
 
-    while (
-        len(chatbot.student.completed_lessons) > 1
-        and lesson_title == chatbot.student.last_quiz_lesson
-    ):
-        lesson_index = random.randrange(
-            len(chatbot.student.completed_lessons)
+    # Extract all meaningful learning points for this lesson
+    learning_points = chatbot.student.lesson_learning_points.get(
+        lesson_title
+    )
+
+    if not learning_points:
+
+        learning_points = chatbot.student.lesson_learning_points.get(
+            lesson_title,
+            []
         )
 
-        lesson_title = chatbot.student.completed_lessons[
-            lesson_index
-        ]
+        chatbot.student.lesson_learning_points[
+            lesson_title
+        ] = learning_points
 
-        lesson_content = chatbot.student.completed_lesson_contents[
-            lesson_index
-        ]
+        chatbot.student.save()
 
-    recent_quiz_history = chatbot.student.quiz_history
+    # Hard maximum of 5 quiz questions per lesson
+    learning_points = learning_points[:5]
 
-    history_text = ""
+    # Find learning points that have already been tested
+    tested_learning_points = []
 
-    for item in recent_quiz_history:
+    for item in chatbot.student.quiz_history:
 
-        if isinstance(item, dict):
-            history_text += (
-                f"- Question: {item['question']}\n"
-                f"  Lesson: {item['lesson']}\n"
+        if not isinstance(item, dict):
+            continue
+
+        if item.get("lesson") != lesson_title:
+            continue
+
+        learning_point = item.get(
+            "learning_point",
+            ""
+        ).strip()
+
+        if learning_point:
+            tested_learning_points.append(
+                normalize_learning_point(learning_point)
             )
 
-        else:
-            history_text += (
-                f"- Question: {item}\n"
-                f"  Lesson: Unknown\n"
-            )
+    # Keep only learning points that have NOT been tested
+    remaining_learning_points = []
 
-    prompt = QUIZ_PROMPT.format(
+    for point in learning_points:
+
+        if normalize_learning_point(point) not in tested_learning_points:
+            remaining_learning_points.append(point)
+
+    # No unused learning points remain
+    if not remaining_learning_points:
+        return (
+            "All meaningful learning points in this lesson "
+            "have already been quizzed."
+        )
+
+    # Select exactly ONE learning point for this quiz
+    target_learning_point = remaining_learning_points[0]
+
+    # Give the model ONLY this learning point
+    history_text = f"""
+    The ONLY learning point you may test is:
+
+    {target_learning_point}
+
+    You MUST test this exact learning point.
+    Do not choose a different learning point.
+    Do not broaden, narrow, or substitute it.
+    """
+
+    base_prompt = QUIZ_PROMPT.format(
         topic=chatbot.student.current_course,
         lesson_title=lesson_title,
         lesson_content=lesson_content,
         quiz_history=history_text
     )
 
-    MAX_QUIZ_RETRIES = 3
+    prompt = base_prompt
+
+    MAX_QUIZ_RETRIES = 2
 
     for attempt in range(MAX_QUIZ_RETRIES):
 
-        answer = chatbot.ask(prompt)
+        answer = chatbot.ask_once(prompt)
 
-        if not validate_quiz(answer):
+        answer = clean_quiz_format(answer)
+
+        valid = validate_quiz(answer)
+
+        if not valid:
 
             if attempt == MAX_QUIZ_RETRIES - 1:
                 return (
@@ -354,42 +657,87 @@ def quiz_command(chatbot):
                     "Please use /quiz again."
                 )
 
+            prompt = base_prompt + """
+
+IMPORTANT:
+
+The previous response did not follow the required output format.
+
+Generate exactly ONE multiple-choice question.
+
+Use exactly this structure:
+
+Question:
+<question>
+
+A. <option>
+B. <option>
+C. <option>
+D. <option>
+
+Correct Answer: <A/B/C/D>
+
+Explanation:
+<1-2 sentences>
+
+Correct Answer must contain ONLY one letter.
+Do not include Learning Point, Answer, Options, Rationale,
+Follow-up question, or any other text.
+"""
+
             continue
 
         question = extract_quiz_question(answer)
         question_text = extract_quiz_question_text(answer)
 
-        if is_duplicate_quiz(
-            chatbot,
-            question_text,
-            lesson_title
-        ):
+        learning_start = answer.find("Learning Point:")
+        explanation_start = answer.find("Explanation:")
 
-            prompt += f"""
-
-    IMPORTANT:
-
-    The generated question was already used or is too similar
-    to a previous quiz question.
-
-    Rejected question:
-    {question_text}
-
-    Generate a DIFFERENT question that tests another important
-    learning point from the lesson.
-
-    Do not repeat or closely rephrase the rejected question.
-    Choose a different learning point when one is available.
-    """
-
+        if learning_start == -1 or explanation_start == -1:
             if attempt == MAX_QUIZ_RETRIES - 1:
                 return (
-                    "Quiz generation failed because "
-                    "a unique question could not be created. "
+                    "Quiz generation failed after "
+                    f"{MAX_QUIZ_RETRIES} attempts. "
                     "Please use /quiz again."
                 )
 
+            prompt = base_prompt + """
+
+        IMPORTANT:
+
+        The previous response did not follow the required output format.
+
+        Generate exactly ONE multiple-choice question.
+
+        Use exactly this structure:
+
+        Question:
+        <question>
+
+        A. <option>
+        B. <option>
+        C. <option>
+        D. <option>
+
+        Correct Answer: <A/B/C/D>
+
+        Learning Point:
+        <one short learning point>
+
+        Explanation:
+        <1-2 sentences>
+
+        Correct Answer must contain ONLY one letter.
+        Do not include Answer, Options, Rationale,
+        Follow-up question, or any other text.
+        """
+
             continue
+
+        learning_point = answer[
+            learning_start + len("Learning Point:"):
+            explanation_start
+        ].strip()
 
         break
 
@@ -397,17 +745,24 @@ def quiz_command(chatbot):
     chatbot.student.current_quiz_lesson = lesson_title
 
     correct_start = answer.find("Correct Answer:")
+    learning_start = answer.find("Learning Point:")
     explanation_start = answer.find("Explanation:")
+
+    if (
+        correct_start == -1
+        or learning_start == -1
+        or explanation_start == -1
+    ):
+        return "Quiz generation failed because the answer format was incomplete."
 
     correct = answer[
         correct_start + len("Correct Answer:"):
-        explanation_start
+        learning_start
     ].strip()
 
-    explanation = answer.split(
-        "Explanation:",
-        1
-    )[1].strip()
+    explanation = answer[
+        explanation_start + len("Explanation:")
+    :].strip()
 
     chatbot.student.correct_answer = correct.upper()
     chatbot.student.explanation = explanation
@@ -416,8 +771,10 @@ def quiz_command(chatbot):
     chatbot.student.quiz_active = True
 
     chatbot.student.quiz_history.append({
-    "question": question_text,
-    "lesson": lesson_title
+        "question": question_text,
+        "lesson": lesson_title,
+        "correct_answer": correct.upper(),
+        "learning_point": learning_point
     })
 
     chatbot.student.save()
@@ -655,6 +1012,16 @@ to start another course.
 
         if quality_result.strip().upper().startswith("PASS"):
 
+            learning_points = extract_learning_points(
+                chatbot,
+                topic,
+                lesson_title,
+                answer
+            )
+
+            # Maximum of 5 quiz questions per lesson
+            learning_points = learning_points[:5]
+
             chatbot.student.completed_lessons.append(
                 lesson_title
             )
@@ -662,6 +1029,10 @@ to start another course.
             chatbot.student.completed_lesson_contents.append(
                 answer
             )
+
+            chatbot.student.lesson_learning_points[
+                lesson_title
+            ] = learning_points
 
             chatbot.student.current_lesson += 1
             chatbot.student.save()
@@ -1372,8 +1743,15 @@ COMMON_QUESTION_WORDS = {
 
 def are_similar_questions(question1, question2):
 
-    words1 = set(normalize_question(question1).split())
-    words2 = set(normalize_question(question2).split())
+    normalized1 = normalize_question(question1)
+    normalized2 = normalize_question(question2)
+
+    # Exact normalized match
+    if normalized1 == normalized2:
+        return True
+
+    words1 = set(normalized1.split())
+    words2 = set(normalized2.split())
 
     words1 -= COMMON_QUESTION_WORDS
     words2 -= COMMON_QUESTION_WORDS
@@ -1381,24 +1759,81 @@ def are_similar_questions(question1, question2):
     if not words1 or not words2:
         return False
 
+    # Strong word overlap
     common_words = words1.intersection(words2)
     total_words = words1.union(words2)
 
     similarity = len(common_words) / len(total_words)
 
-    return similarity >= 0.65
+    if similarity >= 0.80:
+        return True
 
-def normalize_question(question):
+    # Important learning-point keywords
+    learning_points = [
+        {
+            "name": "steering",
+            "keywords": {
+                "steer",
+                "steering",
+                "handlebars",
+                "turning",
+                "turn"
+            }
+        },
+        {
+            "name": "braking",
+            "keywords": {
+                "brake",
+                "brakes",
+                "braking",
+                "stopping",
+                "stop",
+                "skidding"
+            }
+        },
+        {
+            "name": "balance",
+            "keywords": {
+                "balance",
+                "balancing",
+                "stable",
+                "stability",
+                "centered"
+            }
+        },
+        {
+            "name": "pedaling",
+            "keywords": {
+                "pedal",
+                "pedaling",
+                "pedals",
+                "rhythm",
+                "circular"
+            }
+        },
+        {
+            "name": "starting",
+            "keywords": {
+                "start",
+                "starting",
+                "push",
+                "push-off",
+                "move"
+            }
+        }
+    ]
 
-    question = question.lower().strip()
+    for point in learning_points:
 
-    question = question.translate(
-        str.maketrans("", "", string.punctuation)
-    )
+        keywords = point["keywords"]
 
-    question = " ".join(question.split())
+        matches1 = words1.intersection(keywords)
+        matches2 = words2.intersection(keywords)
 
-    return question
+        if matches1 and matches2:
+            return True
+
+    return False
 
 def is_duplicate_flashcard(chatbot, question, lesson_title):
 
