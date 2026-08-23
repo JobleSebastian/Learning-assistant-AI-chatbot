@@ -175,34 +175,6 @@ def extract_learning_points(chatbot, topic, lesson_title, lesson_content):
 
     return learning_points
 
-def test_learning_point_extraction(chatbot):
-
-    lesson_title = chatbot.student.completed_lessons[1]
-
-    lesson_index = chatbot.student.completed_lessons.index(
-        lesson_title
-    )
-
-    lesson_content = chatbot.student.completed_lesson_contents[
-        lesson_index
-    ]
-
-    points = extract_learning_points(
-        chatbot,
-        chatbot.student.current_course,
-        lesson_title,
-        lesson_content
-    )
-
-    print("\n========== LEARNING POINT TEST ==========")
-    print("Lesson:", lesson_title)
-    print("Number of points:", len(points))
-
-    for i, point in enumerate(points, 1):
-        print(f"{i}. {point}")
-
-    print("=========================================")
-
 def is_duplicate_quiz(
     chatbot,
     question,
