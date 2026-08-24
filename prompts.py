@@ -9,6 +9,7 @@ Rules:
 5. Be patient and encouraging.
 """
 
+
 LEARNING_POINT_PROMPT = """
 You are an expert teacher analyzing a beginner lesson.
 
@@ -23,11 +24,26 @@ Lesson Content:
 
 Extract ALL distinct main learning points from this lesson.
 
+IMPORTANT:
+Identify the main concepts the learner is expected to understand from the lesson, not every factual statement contained in it.
+
+A single main concept may contain several facts, examples, characteristics, steps, or supporting details. Combine those details into the same learning point when they collectively teach that concept.
+
+The number of learning points should reflect the number of independently testable concepts taught by the lesson, not the number of facts or sentences.
+
 A learning point must be:
-- an important rule, concept, definition, component function,
-  technique, or safety instruction
+- an important rule, concept, definition, component function, technique, or safety instruction
 - explicitly supported by the lesson
 - something that can reasonably be tested with ONE quiz question
+
+GROUPING RULE:
+- Group related details that belong to the same rule, technique, procedure, or concept into ONE learning point.
+- Include the important steps, characteristics, supporting details, purpose, benefits, and outcomes of that concept within the same learning point when they describe the same thing.
+- Do not split a technique into separate points for its grip, stance, body position, movement, swing, follow-through, or other individual steps unless they are genuinely independent concepts taught separately in the lesson.
+- Do not split a plan, routine, schedule, or procedure into separate points for each step, time allocation, or component.
+- Do not create separate points for examples, measurements, supporting facts, strategic uses, benefits, or outcomes when they belong to an existing concept.
+- Create a separate learning point only when it represents a genuinely different concept that could be independently tested with one quiz question.
+- Completely ignore practical exercises when extracting learning points.
 
 Do NOT include:
 - examples
@@ -40,7 +56,9 @@ Do NOT include:
 Each learning point must represent ONE distinct concept.
 
 The number of learning points may vary. Some lessons may have
-only 2, while others may have 3, 4, or more.
+only 2, while others may have 3, 4, or 5.
+
+Maximum number of learning points: 5.
 
 Do not invent learning points just to increase the number.
 
@@ -54,6 +72,7 @@ Learning Point 2:
 
 Continue only while genuinely distinct learning points remain.
 """
+
 
 QUIZ_PROMPT = """
 You are an expert teacher creating ONE multiple-choice quiz question for a beginner.
@@ -173,6 +192,7 @@ Correct Answer must contain ONLY A, B, C, or D.
 Do not include the option text after Correct Answer.
 Do not use Markdown bold.
 """
+
 
 QUALITY_CHECK_PROMPT = """
 You are a careful educational content reviewer.
