@@ -389,19 +389,24 @@ def choose_quiz_lesson(chatbot):
     if not lessons:
         return None
 
-    lesson_counts = {
-        lesson: get_lesson_quiz_count(
+    available_lessons = []
+
+    for lesson in lessons:
+
+        learning_points = chatbot.student.lesson_learning_points.get(
+            lesson,
+            []
+        )
+
+        learning_points = learning_points[:5]
+
+        quiz_count = get_lesson_quiz_count(
             chatbot,
             lesson
         )
-        for lesson in lessons
-    }
 
-    available_lessons = [
-        lesson
-        for lesson in lessons
-        if lesson_counts[lesson] < MAX_QUESTIONS_PER_LESSON
-    ]
+        if quiz_count < len(learning_points):
+            available_lessons.append(lesson)
 
     if not available_lessons:
         return None
@@ -500,6 +505,106 @@ def clean_quiz_format(text):
 
     return text.strip()
 
+def choose_answer_position(chatbot):
+
+    recent = chatbot.student.quiz_answer_positions[-4:]
+
+    positions = ["A", "B", "C", "D"]
+
+    counts = {
+        position: recent.count(position)
+        for position in positions
+    }
+
+    # Prefer positions that have appeared the least recently.
+    minimum_count = min(counts.values())
+
+    available = [
+        position
+        for position in positions
+        if counts[position] == minimum_count
+    ]
+
+    return random.choice(available)
+
+def shuffle_quiz_options(answer, target_position):
+
+    option_pattern = re.compile(
+        r"^([A-D])\.\s*(.+)$",
+        re.MULTILINE
+    )
+
+    matches = option_pattern.findall(answer)
+
+    if len(matches) != 4:
+        return answer
+
+    options = {
+        letter: text.strip()
+        for letter, text in matches
+    }
+
+    correct_start = answer.find("Correct Answer:")
+
+    if correct_start == -1:
+        return answer
+
+    correct_match = re.search(
+        r"Correct Answer:\s*([A-D])",
+        answer[correct_start:]
+    )
+
+    if not correct_match:
+        return answer
+
+    original_correct = correct_match.group(1)
+
+    # Put the original correct option into the target position.
+    remaining_letters = [
+        letter
+        for letter in ["A", "B", "C", "D"]
+        if letter != original_correct
+    ]
+
+    shuffled_remaining = remaining_letters[:]
+    random.shuffle(shuffled_remaining)
+
+    new_options = {}
+
+    new_options[target_position] = options[original_correct]
+
+    remaining_positions = [
+        letter
+        for letter in ["A", "B", "C", "D"]
+        if letter != target_position
+    ]
+
+    for position, original_letter in zip(
+        remaining_positions,
+        shuffled_remaining
+    ):
+        new_options[position] = options[original_letter]
+
+    # Replace the four options.
+    for letter in ["A", "B", "C", "D"]:
+        answer = re.sub(
+            rf"^{letter}\.\s*.+$",
+            f"{letter}. {new_options[letter]}",
+            answer,
+            count=1,
+            flags=re.MULTILINE
+        )
+
+    # Update Correct Answer.
+    answer = re.sub(
+        r"(Correct Answer:\s*)[A-D]",
+        rf"\g<1>{target_position}",
+        answer,
+        count=1
+    )
+
+    return answer
+
 def quiz_command(chatbot):
 
     if chatbot.student.quiz_active:
@@ -518,8 +623,8 @@ def quiz_command(chatbot):
 
     if lesson_title is None:
         return (
-            "All completed lessons have reached "
-            f"{MAX_QUESTIONS_PER_LESSON} quiz questions."
+            "All available learning points in the completed lessons "
+            "have already been quizzed."
         )
 
     lesson_index = chatbot.student.completed_lessons.index(
@@ -530,7 +635,7 @@ def quiz_command(chatbot):
         lesson_index
     ]
 
-    # Extract all meaningful learning points for this lesson
+    # Get stored learning points for this lesson
     learning_points = chatbot.student.lesson_learning_points.get(
         lesson_title
     )
@@ -711,6 +816,25 @@ Follow-up question, or any other text.
             explanation_start
         ].strip()
 
+        target_position = choose_answer_position(chatbot)
+
+        answer = shuffle_quiz_options(
+            answer,
+            target_position
+        )
+
+        chatbot.student.quiz_answer_positions.append(
+            target_position
+        )
+
+        chatbot.student.quiz_answer_positions = (
+            chatbot.student.quiz_answer_positions[-4:]
+        )
+
+        # Re-extract the question after option shuffling.
+        question = extract_quiz_question(answer)
+        question_text = extract_quiz_question_text(answer)
+
         break
 
     chatbot.student.last_quiz_lesson = lesson_title
@@ -746,7 +870,7 @@ Follow-up question, or any other text.
         "question": question_text,
         "lesson": lesson_title,
         "correct_answer": correct.upper(),
-        "learning_point": learning_point
+        "learning_point": target_learning_point
     })
 
     chatbot.student.save()

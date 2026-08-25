@@ -60,6 +60,7 @@ class Student:
             self.quiz_results = data.get("quiz_results", [])
             self.lesson_learning_points = data.get("lesson_learning_points",{})
             self.current_quiz_lesson = data.get("current_quiz_lesson", "")
+          
             
         except FileNotFoundError:
 
@@ -119,6 +120,8 @@ class Student:
 
         self.lesson_learning_points = {}
 
+        self.quiz_answer_positions = []
+
         self.streak = 0
 
     def reset_course(self):
@@ -138,6 +141,14 @@ class Student:
         self.quiz_score = 0
 
         self.quiz_history = []
+
+        self.quiz_active = False
+
+        self.current_question = ""
+
+        self.correct_answer = ""
+
+        self.explanation = ""
 
         self.last_quiz_lesson = ""
 
@@ -164,3 +175,5 @@ class Student:
         self.current_flashcard_lesson = ""
 
         self.lesson_learning_points = {}
+
+        self.quiz_answer_positions = []

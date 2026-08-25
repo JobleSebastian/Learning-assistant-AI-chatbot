@@ -148,6 +148,13 @@ ONE CORRECT ANSWER
 - Avoid "a way", "one way", "a method", or similar wording when multiple answers are valid.
 - Do not use "All of the above" or "None of the above".
 
+ANSWER POSITION RULE:
+- Distribute correct answers across A, B, C, and D.
+- Do NOT repeatedly place the correct answer in the same position.
+- Avoid patterns such as B, B, B or A, A, A.
+- The correct answer position must vary between questions.
+- Before finalizing the question, deliberately choose a different correct-answer position from the previous questions when possible.
+
 QUESTION QUALITY
 - Keep the question clear, direct, and beginner-friendly.
 - Test understanding, identification, distinction, or application of an important lesson point.
