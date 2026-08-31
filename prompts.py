@@ -22,45 +22,39 @@ Lesson:
 Lesson Content:
 {lesson_content}
 
-Extract ALL distinct main learning points from this lesson.
+Extract the distinct MAIN learning points taught in this lesson.
 
-IMPORTANT:
-Identify the main concepts the learner is expected to understand from the lesson, not every factual statement contained in it.
+A learning point is a broad, coherent concept, rule, skill, technique, or
+procedure that the learner is expected to understand. It must be explicitly
+supported by the lesson and should be broad enough to support multiple
+related quiz questions.
 
-A single main concept may contain several facts, examples, characteristics, steps, or supporting details. Combine those details into the same learning point when they collectively teach that concept.
+GROUPING RULES:
+- Treat the lesson objective/title as the primary conceptual boundary.
+- Group all details that belong to the same concept into ONE learning point.
+- Include the concept's relevant definitions, components, types, methods, mechanics, characteristics, purposes, benefits, effects, and applications within that point.
+- When a lesson title introduces a broad objective followed by named components, treat those components as parts of ONE learning point when they are taught as aspects, mechanics, or supporting elements of that objective.
+- When a lesson title names a single technique or skill, create ONE learning point for the entire technique, including its grip, stance, positioning, movement, execution, timing, contact, variations, and follow-through.
+- Do not create a separate learning point for a detail, component, characteristic, method, or technique that merely explains or supports another point.
+- Create a separate learning point ONLY when the lesson explicitly teaches a genuinely different concept, skill, rule, or technique at the same conceptual level, with its own distinct explanation or objective.
+- When a lesson names multiple skills or components under one broader objective, keep them in ONE learning point when they are taught as parts, mechanics, methods, or applications of that objective. Separate them only when the lesson independently teaches each as a distinct concept or skill.
+- When uncertain whether something is a separate concept or a supporting detail, MERGE it.
+- Ignore practical exercises, examples, demonstrations, and incidental details.
+- Do not invent information that is not supported by the lesson.
 
-The number of learning points should reflect the number of independently testable concepts taught by the lesson, not the number of facts or sentences.
+FINAL CHECK:
+Before returning the answer, compare every learning point with the others.
+If one point is mainly a component, type, method, characteristic, purpose,
+benefit, effect, or supporting detail of another, merge it into the broader
+point. Repeat until no point is subordinate to another.
 
-A learning point must be:
-- an important rule, concept, definition, component function, technique, or safety instruction
-- explicitly supported by the lesson
-- something that can reasonably be tested with ONE quiz question
+The goal is the SMALLEST set of learning points that fully covers the main
+concepts of the lesson.
 
-GROUPING RULE:
-- Group related details that belong to the same rule, technique, procedure, or concept into ONE learning point.
-- Include the important steps, characteristics, supporting details, purpose, benefits, and outcomes of that concept within the same learning point when they describe the same thing.
-- Do not split a technique into separate points for its grip, stance, body position, movement, swing, follow-through, or other individual steps unless they are genuinely independent concepts taught separately in the lesson.
-- Do not split a plan, routine, schedule, or procedure into separate points for each step, time allocation, or component.
-- Do not create separate points for examples, measurements, supporting facts, strategic uses, benefits, or outcomes when they belong to an existing concept.
-- Create a separate learning point only when it represents a genuinely different concept that could be independently tested with one quiz question.
-- Completely ignore practical exercises when extracting learning points.
-
-Do NOT include:
-- examples
-- demonstrations
-- practical exercise steps
-- incidental details
-- repeated or overlapping concepts
-- information not stated in the lesson
-
-Each learning point must represent ONE distinct concept.
-
-The number of learning points may vary. Some lessons may have
-only 2, while others may have 3, 4, or 5.
-
-Maximum number of learning points: 5.
-
-Do not invent learning points just to increase the number.
+TARGET GRANULARITY:
+- Usually 1-3 learning points.
+- Use 4 only when there are four genuinely independent concepts.
+- Never split a concept merely to increase the number of points.
 
 Return ONLY this format:
 
@@ -72,7 +66,6 @@ Learning Point 2:
 
 Continue only while genuinely distinct learning points remain.
 """
-
 
 QUIZ_PROMPT = """
 You are an expert teacher creating ONE multiple-choice quiz question for a beginner.

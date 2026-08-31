@@ -380,6 +380,50 @@ def validate_quiz(answer):
 
     return True
 
+def validate_quiz_learning_point(
+    chatbot,
+    answer,
+    target_learning_point
+):
+    prompt = f"""
+You are validating a quiz question.
+
+Target learning point:
+{target_learning_point}
+
+Generated quiz:
+
+{answer}
+
+Determine whether the generated question primarily tests
+the target learning point.
+
+Return ONLY:
+
+YES
+
+or
+
+NO
+
+Return YES if:
+- the question directly tests the target concept
+- the wording may be different but the underlying concept is the same
+- the question does not require a different learning point to answer
+
+Return NO if:
+- the question tests a different concept
+- the question only mentions the target concept but primarily tests something else
+- the question combines multiple separate concepts
+- the question cannot be answered from the target learning point
+
+Do not explain your answer.
+"""
+
+    result = chatbot.ask_once(prompt).strip().upper()
+
+    return result == "YES"
+
 MAX_QUESTIONS_PER_LESSON = 5
 
 def choose_quiz_lesson(chatbot):
@@ -724,6 +768,13 @@ def quiz_command(chatbot):
         answer = clean_quiz_format(answer)
 
         valid = validate_quiz(answer)
+
+        if valid:
+            valid = validate_quiz_learning_point(
+                chatbot,
+                answer,
+                target_learning_point
+            )
 
         if not valid:
 
@@ -2356,8 +2407,27 @@ def execute(chatbot, command):
     elif command == "/progress":
         return progress_command(chatbot)
 
-    elif command == "/next":
-        return next_command(chatbot)
+    elif command.startswith("/next"):
+        parts = command.split()
+
+        if len(parts) == 1:
+            return next_command(chatbot)
+
+        try:
+            count = int(parts[1])
+        except ValueError:
+            return "Usage: /next [number]"
+
+        results = []
+
+        for _ in range(count):
+            result = next_command(chatbot)
+            results.append(result)
+
+            if chatbot.student.current_lesson > len(chatbot.student.course_outline):
+                break
+
+        return "\n\n".join(results)
 
     elif command == "/reset":
         return reset_command(chatbot)
