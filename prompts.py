@@ -96,11 +96,9 @@ Rules:
 
 LEARNING POINT PRIORITY
 
-First identify the important main-lesson concepts in the lesson.
-
-A main-lesson concept is a rule, definition, component function,
-technique, or safety instruction that teaches the learner something
-important.
+- First identify the important main-lesson concepts in the lesson.
+- A main-lesson concept is a rule, definition, component function, technique, or safety instruction that teaches the learner something important.
+- The question must test the assigned learning point specifically. Do not test a different concept merely because it is related to the lesson.
 
 Do NOT create a question from:
 - practical exercise steps
@@ -119,22 +117,27 @@ CONTENT
 - Do not use outside knowledge or add, correct, reinterpret, or expand the lesson.
 - The question, options, correct answer, and explanation must all be supported by the lesson.
 - Preserve important conditions and relationships when paraphrasing; do not change the meaning.
+- Do not infer, substitute, or strengthen relationships that are not explicitly stated in the lesson. When the lesson names a specific term or condition, use that exact concept rather than a related term.
+- Do not reverse the direction of a relationship when applying a rule or changing a value. Preserve which action causes which effect exactly as stated in the lesson.
+- Do not introduce rankings, priorities, absolutes, or comparisons such as "most important", "best", "main", "only", or "always" unless the lesson explicitly establishes them.
 
 UNIQUENESS
-- Do not test the same underlying learning point as a previous question, even with different wording.
+- Do not test the same underlying fact, rule, relationship, technique, or application as a previous question, even if the Learning Point wording is different.
+- Compare the new question against the actual content of previous questions, not only their Learning Point labels.
 - Review both the previous questions AND their Learning Points.
 - Choose an important learning point that has not already been tested.
-- Treat different wording as the same if it tests the same underlying fact, rule, technique, or concept.
 - Prioritize main lesson concepts over examples, minor details, and practical exercises.
 - Do not use a practical exercise while an important main-lesson learning point remains untested.
 - Use practical exercise content only after the important main-lesson concepts are exhausted.
-- Each question should primarily test ONE learning point.
+- Test the assigned learning point and no other learning point.
+- If the question requires knowledge from another learning point to answer it, rewrite it.
 - Do not combine two separate rules, techniques, or facts in the same question.
 - The explanation should explain only the learning point being tested.
 
 ONE CORRECT ANSWER
 - Exactly ONE option must be supported as correct by the lesson.
-- Check every option against the lesson before finalizing.
+- Check every option against the complete lesson statement, including alternatives, exceptions, and conditions.
+- Verify that the correct option matches the exact relationship stated in the lesson, not merely a related or partially correct concept.
 - If multiple options could be correct, create a different question.
 - Do not make a valid option incorrect through wording alone.
 - When multiple valid answers exist, ask for the complete set or a distinguishing detail with only one correct answer.
@@ -157,6 +160,7 @@ QUESTION QUALITY
 - Do not make the correct option noticeably longer or more detailed than the distractors.
 - Vary the correct-answer position when reasonably possible.
 - Do not change the question, options, or wording merely to force a particular correct-answer position.
+- Do not combine details from different parts of the lesson in a way that makes the question ambiguous or gives multiple options partial support.
 
 LEARNING POINT
 - Identify exactly ONE learning point being tested.
