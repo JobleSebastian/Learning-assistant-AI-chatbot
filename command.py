@@ -260,6 +260,85 @@ def is_duplicate_quiz(
 
     return False
 
+def is_semantic_duplicate_quiz(
+    chatbot,
+    question,
+    lesson_title,
+    learning_point
+):
+
+    previous_questions = [
+        item
+        for item in chatbot.student.quiz_history
+        if (
+            isinstance(item, dict)
+            and item.get("lesson") == lesson_title
+            and item.get("learning_point")
+            and item.get("question")
+            and normalize_learning_point(
+                item["learning_point"]
+            ) == normalize_learning_point(learning_point)
+        )
+    ]
+
+    if not previous_questions:
+        return False
+
+    history_text = ""
+
+    for item in previous_questions:
+        history_text += (
+            f"- Question: {item['question']}\n"
+            f"  Learning Point: {item['learning_point']}\n"
+        )
+
+    prompt = f"""
+You are checking whether a newly generated quiz question
+repeats a previous question for the SAME learning point.
+
+Learning Point:
+{learning_point}
+
+New Quiz Question:
+{question}
+
+Previous Questions for this Learning Point:
+{history_text}
+
+Determine whether the new question tests essentially the same
+underlying fact, rule, relationship, technique, definition,
+application, or concept as any previous question listed above.
+
+Different wording or a different question angle does NOT make
+the question unique if it tests the same underlying concept.
+
+Return DUPLICATE if it tests the same underlying concept.
+
+Return UNIQUE if it tests a genuinely different aspect of the
+assigned learning point.
+
+Return EXACTLY one word:
+
+DUPLICATE
+
+or
+
+UNIQUE
+
+Do not provide an explanation.
+"""
+
+    result = chatbot.ask_once(prompt).strip().upper()
+
+    print("\n========== QUIZ SEMANTIC DUPLICATE CHECK ==========")
+    print("Lesson:", lesson_title)
+    print("Learning Point:", learning_point)
+    print("New Question:", question)
+    print("Result:", result)
+    print("====================================================\n")
+
+    return result == "DUPLICATE"
+
 def extract_quiz_question_text(answer):
 
     correct_start = answer.find("Correct Answer:")
@@ -866,6 +945,38 @@ Follow-up question, or any other text.
             learning_start + len("Learning Point:"):
             explanation_start
         ].strip()
+
+        if is_semantic_duplicate_quiz(
+            chatbot,
+            question_text,
+            lesson_title,
+            target_learning_point
+        ):
+
+            if attempt == MAX_QUIZ_RETRIES - 1:
+                return (
+                    "Quiz generation failed because "
+                    "a unique question could not be created. "
+                    "Please use /quiz again."
+                )
+
+            prompt = base_prompt + f"""
+
+        IMPORTANT:
+
+        The previous question was rejected because it tests the same
+        underlying concept as a previous quiz question.
+
+        Rejected question:
+        {question_text}
+
+        Generate a DIFFERENT question that tests the assigned learning point
+        from a genuinely different underlying concept.
+
+        Do not repeat or closely rephrase the rejected question.
+        """
+
+            continue
 
         target_position = choose_answer_position(chatbot)
 
